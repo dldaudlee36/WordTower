@@ -24,11 +24,23 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  const storageKey = `wt_cleared_words_v8_stage_${globalStageNumber}`;
+  // v9 스토리지 키로 이전 음수 오염 데이터 완전 초기화
+  const storageKey = `wt_cleared_words_v9_stage_${globalStageNumber}`;
+  
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
-    const saved = localStorage.getItem(storageKey);
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
+
+  // Stale Closure 방지를 위한 실시간 참조 레퍼런스
+  const clearedWordsRef = useRef<string[]>(clearedWords);
+  useEffect(() => {
+    clearedWordsRef.current = clearedWords;
+  }, [clearedWords]);
 
   const [revealedCountMap, setRevealedCountMap] = useState<Record<string, number>>({});
   const [isHintModalOpen, setIsHintModalOpen] = useState(false);
@@ -46,8 +58,15 @@ export const WordTowerBoard: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    setClearedWords(saved ? JSON.parse(saved) : []);
+    try {
+      const saved = localStorage.getItem(storageKey);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setClearedWords(parsed);
+      clearedWordsRef.current = parsed;
+    } catch {
+      setClearedWords([]);
+      clearedWordsRef.current = [];
+    }
     setRevealedCountMap({});
   }, [globalStageNumber, storageKey]);
 
@@ -61,16 +80,20 @@ export const WordTowerBoard: React.FC<Props> = ({
       cols: stage.cols,
       onWordSubmit: (selectedChars) => {
         const word = selectedChars.join('');
-        if (stage.targetWords.includes(word) && !clearedWords.includes(word)) {
-          setClearedWords((prev) => {
-            const next = [...prev, word];
-            localStorage.setItem(storageKey, JSON.stringify(next));
-            if (next.length === stage.targetWords.length) {
-              setTimeout(onClear, 500);
-            }
-            return next;
-          });
-          return true;
+        const currentCleared = clearedWordsRef.current;
+
+        // 대상 단어에 포함되어 있고 아직 클리어하지 않은 경우에만 승인
+        if (stage.targetWords.includes(word) && !currentCleared.includes(word)) {
+          const next = [...currentCleared, word];
+          clearedWordsRef.current = next;
+          setClearedWords(next);
+          localStorage.setItem(storageKey, JSON.stringify(next));
+
+          // 6개 단어를 모두 맞추면 즉시 클리어 팝업 호출
+          if (next.length >= stage.targetWords.length) {
+            setTimeout(onClear, 400);
+          }
+          return true; // 정답 처리 (타일 소등)
         }
         return false;
       },
@@ -80,7 +103,7 @@ export const WordTowerBoard: React.FC<Props> = ({
     });
 
     const clonedGrid = JSON.parse(JSON.stringify(stage.grid));
-    engine.init(clonedGrid, clearedWords);
+    engine.init(clonedGrid, clearedWordsRef.current);
     engineRef.current = engine;
 
     return () => {
@@ -91,7 +114,7 @@ export const WordTowerBoard: React.FC<Props> = ({
 
   const handleApplyHint = () => {
     if (hintPassword.trim() === '대전a반최고') {
-      const remainingWords = stage.targetWords.filter((w) => !clearedWords.includes(w));
+      const remainingWords = stage.targetWords.filter((w) => !clearedWordsRef.current.includes(w));
       if (remainingWords.length > 0 && engineRef.current) {
         const targetWord = remainingWords.find(
           (w) => (revealedCountMap[w] || 0) < w.length
@@ -115,7 +138,8 @@ export const WordTowerBoard: React.FC<Props> = ({
     }
   };
 
-  const remainingCount = stage.targetWords.length - clearedWords.length;
+  // 음수 발생을 원천 차단하는 안전한 잔여 카운트 연산
+  const remainingCount = Math.max(0, stage.targetWords.length - new Set(clearedWords).size);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
@@ -257,7 +281,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 힌트 슬롯 (4글자 2개, 3글자 4개 = 총 20칸 규격) */}
+        {/* 힌트 슬롯 (4글자 2개, 3글자 4개) */}
         <div
           style={{
             display: 'grid',
@@ -321,6 +345,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* 캔버스 영역 */}
       <div
         ref={containerRef}
         style={{
@@ -334,6 +359,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
+      {/* 게임 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
@@ -368,9 +394,9 @@ export const WordTowerBoard: React.FC<Props> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#cbd5e1', lineHeight: '1.5' }}>
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #38bdf8' }}>
-                <strong style={{ color: '#f8fafc' }}>1. 50챕터 1,000 스테이지 고정</strong>
+                <strong style={{ color: '#f8fafc' }}>1. 공통 고정 스테이지</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  모든 플레이어는 각 스테이지마다 <strong>동일한 6개의 단어와 동일한 격자 배치</strong>를 공유합니다.
+                  모든 플레이어는 스테이지 번호마다 <strong>동일한 6개의 단어와 동일한 격자 배치</strong>를 공유합니다.
                 </p>
               </div>
 
@@ -410,6 +436,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
+      {/* 힌트 모달 */}
       {isHintModalOpen && (
         <div
           style={{
