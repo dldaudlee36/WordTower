@@ -24,8 +24,7 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  // v9 스토리지 키로 이전 음수 오염 데이터 완전 초기화
-  const storageKey = `wt_cleared_words_v9_stage_${globalStageNumber}`;
+  const storageKey = `wt_cleared_words_v10_stage_${globalStageNumber}`;
   
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     try {
@@ -36,7 +35,6 @@ export const WordTowerBoard: React.FC<Props> = ({
     }
   });
 
-  // Stale Closure 방지를 위한 실시간 참조 레퍼런스
   const clearedWordsRef = useRef<string[]>(clearedWords);
   useEffect(() => {
     clearedWordsRef.current = clearedWords;
@@ -82,18 +80,16 @@ export const WordTowerBoard: React.FC<Props> = ({
         const word = selectedChars.join('');
         const currentCleared = clearedWordsRef.current;
 
-        // 대상 단어에 포함되어 있고 아직 클리어하지 않은 경우에만 승인
         if (stage.targetWords.includes(word) && !currentCleared.includes(word)) {
           const next = [...currentCleared, word];
           clearedWordsRef.current = next;
           setClearedWords(next);
           localStorage.setItem(storageKey, JSON.stringify(next));
 
-          // 6개 단어를 모두 맞추면 즉시 클리어 팝업 호출
           if (next.length >= stage.targetWords.length) {
             setTimeout(onClear, 400);
           }
-          return true; // 정답 처리 (타일 소등)
+          return true;
         }
         return false;
       },
@@ -138,7 +134,14 @@ export const WordTowerBoard: React.FC<Props> = ({
     }
   };
 
-  // 음수 발생을 원천 차단하는 안전한 잔여 카운트 연산
+  const handleResetCurrentStage = () => {
+    localStorage.removeItem(storageKey);
+    setClearedWords([]);
+    clearedWordsRef.current = [];
+    setRevealedCountMap({});
+    onReset();
+  };
+
   const remainingCount = Math.max(0, stage.targetWords.length - new Set(clearedWords).size);
 
   return (
@@ -165,7 +168,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* 상단 헤더 */}
+      {/* 헤더 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -237,7 +240,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             </button>
 
             <button
-              onClick={onReset}
+              onClick={handleResetCurrentStage}
               title="다시 하기"
               style={{
                 width: '36px',
@@ -281,7 +284,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 힌트 슬롯 (4글자 2개, 3글자 4개) */}
+        {/* 힌트 슬롯 */}
         <div
           style={{
             display: 'grid',
@@ -345,7 +348,6 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 캔버스 영역 */}
       <div
         ref={containerRef}
         style={{
