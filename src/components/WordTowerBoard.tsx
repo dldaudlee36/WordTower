@@ -90,10 +90,12 @@ export const WordTowerBoard: React.FC<Props> = ({
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
       
-      {/* 1. 상단 헤더 영역 */}
-      <div style={{ width: '100%', maxWidth: '380px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     {/* 1. 상단 헤더 영역 (2단 정렬 구조로 개편) */}
+      <div style={{ width: '100%', maxWidth: '360px', marginBottom: '12px' }}>
+        
+        {/* 상단 1열: 스테이지 뱃지, 타이틀, 액션 버튼 3종 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <button
               onClick={onOpenMenu}
               title="스테이지 선택"
@@ -102,111 +104,112 @@ export const WordTowerBoard: React.FC<Props> = ({
                 color: '#fff',
                 border: 'none',
                 borderRadius: '6px',
-                padding: '3px 8px',
+                padding: '4px 8px',
                 fontSize: '11px',
                 fontWeight: 800,
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               CH.{chapterNumber} - STAGE {stageNumber} ☰
             </button>
-            <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#60a5fa', margin: 0 }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 900, color: '#60a5fa', margin: 0, whiteSpace: 'nowrap' }}>
               워드타워
             </h1>
           </div>
-          <p style={{ fontSize: '12px', color: '#94a3b8', margin: '3px 0 0 0' }}>
+
+          {/* 액션 버튼 그룹 (❓, 💡, ↺) - 정사각 36px 규격 통일 */}
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => setIsHelpModalOpen(true)}
+              title="게임 설명서"
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#1e293b',
+                border: '1px solid #38bdf8',
+                borderRadius: '8px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              ❓
+            </button>
+
+            <button
+              onClick={() => {
+                setIsHintModalOpen(true);
+                setHintError(false);
+              }}
+              title="힌트 받기"
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#1e293b',
+                border: '1px solid #eab308',
+                borderRadius: '8px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              💡
+            </button>
+
+            <button
+              onClick={onReset}
+              title="다시 하기"
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#1e293b',
+                border: '1px solid #334155',
+                color: '#94a3b8',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              ↺
+            </button>
+          </div>
+        </div>
+
+        {/* 상단 2열: 안내 문구 & 남은 단어 배지 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, whiteSpace: 'nowrap' }}>
             숨겨진 6개 단어를 드래그해 완성하세요
           </p>
-        </div>
 
-        {/* 남은 단어, 설명서, 힌트, 다시하기 컨트롤러 그룹 */}
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'stretch', height: '48px' }}>
           <div
             style={{
-              display: 'flex',
-              flexDirection: 'column',
+              display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              gap: '6px',
               background: '#1e293b',
-              border: '2px solid #3b82f6',
-              borderRadius: '10px',
-              padding: '0 8px',
-              minWidth: '58px',
-              boxSizing: 'border-box',
+              border: '1px solid #3b82f6',
+              borderRadius: '6px',
+              padding: '2px 8px',
+              whiteSpace: 'nowrap',
             }}
           >
-            <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600, lineHeight: 1 }}>남은 단어</span>
-            <span style={{ fontSize: '17px', fontWeight: 800, color: '#60a5fa', lineHeight: 1, marginTop: '3px' }}>
-              {remainingCount}
-            </span>
+            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>남은 단어</span>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: '#60a5fa' }}>{remainingCount}</span>
           </div>
-
-          {/* 게임 설명서 버튼 */}
-          <button
-            onClick={() => setIsHelpModalOpen(true)}
-            title="게임 설명서"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#1e293b',
-              border: '1px solid #38bdf8',
-              color: '#38bdf8',
-              borderRadius: '10px',
-              padding: '0 10px',
-              fontSize: '16px',
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-            }}
-          >
-            ❓
-          </button>
-
-          {/* 힌트 버튼 */}
-          <button
-            onClick={() => {
-              setIsHintModalOpen(true);
-              setHintError(false);
-            }}
-            title="힌트 받기"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#1e293b',
-              border: '1px solid #eab308',
-              color: '#eab308',
-              borderRadius: '10px',
-              padding: '0 10px',
-              fontSize: '16px',
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-            }}
-          >
-            💡
-          </button>
-
-          {/* 다시하기 버튼 */}
-          <button
-            onClick={onReset}
-            title="다시 하기"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#1e293b',
-              border: '1px solid #334155',
-              color: '#94a3b8',
-              borderRadius: '10px',
-              padding: '0 10px',
-              fontSize: '16px',
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-            }}
-          >
-            ↺
-          </button>
         </div>
+
       </div>
 
       {/* 2. 캔버스 영역 */}
