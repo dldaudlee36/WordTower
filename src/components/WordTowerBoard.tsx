@@ -90,8 +90,8 @@ export const WordTowerBoard: React.FC<Props> = ({
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
       
-     {/* 1. 상단 헤더 영역 (2단 정렬 구조로 개편) */}
-      <div style={{ width: '100%', maxWidth: '360px', marginBottom: '12px' }}>
+      {/* 1. 상단 헤더 영역 */}
+      <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         
         {/* 상단 1열: 스테이지 뱃지, 타이틀, 액션 버튼 3종 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -119,7 +119,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             </h1>
           </div>
 
-          {/* 액션 버튼 그룹 (❓, 💡, ↺) - 정사각 36px 규격 통일 */}
+          {/* 액션 버튼 그룹 (❓, 💡, ↺) */}
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
             <button
               onClick={() => setIsHelpModalOpen(true)}
@@ -188,7 +188,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
 
         {/* 상단 2열: 안내 문구 & 남은 단어 배지 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, whiteSpace: 'nowrap' }}>
             숨겨진 6개 단어를 드래그해 완성하세요
           </p>
@@ -210,14 +210,56 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* 2. 글자 수 힌트 블라인드 슬롯 (6단어) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '6px',
+            background: '#0f172a',
+            padding: '8px',
+            borderRadius: '10px',
+            border: '1px solid #1e293b',
+          }}
+        >
+          {stage.targetWords.map((word, idx) => {
+            const isCleared = clearedWords.includes(word);
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '28px',
+                  borderRadius: '6px',
+                  background: isCleared ? 'rgba(37, 99, 235, 0.25)' : '#1e293b',
+                  border: isCleared ? '1px solid #3b82f6' : '1px dashed #475569',
+                  transition: 'all 0.25s ease',
+                }}
+              >
+                {isCleared ? (
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#60a5fa', letterSpacing: '0.5px' }}>
+                    {word}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '2px' }}>
+                    {'●'.repeat(word.length)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
       </div>
 
-      {/* 2. 캔버스 영역 */}
+      {/* 3. 캔버스 영역 (5행 4열 보드) */}
       <div
         ref={containerRef}
         style={{
           width: '360px',
-          height: '450px',
+          height: '430px',
           backgroundColor: '#0f172a',
           borderRadius: '16px',
           border: '1px solid #334155',
