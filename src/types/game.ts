@@ -1,17 +1,18 @@
 export interface TileData {
   id: string;
   char: string;
-  wordId: number;
+  word: string;     // 해당 타일이 속한 정확한 단어 문자열
+  wordIndex: number;// 0 ~ 5
+  charIndex: number;// 단어 내 글자 순서 (0, 1, 2...)
   row: number;
   col: number;
 }
 
-// 이 GridData export가 누락되어 에러가 났던 것입니다.
-export type GridData = (TileData | null)[][];
+export type GridData = TileData[][];
 
 export interface StageData {
   rows: number;
   cols: number;
-  grid: GridData;
   targetWords: string[];
+  grid: GridData;
 }
