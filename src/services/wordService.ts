@@ -29,10 +29,10 @@ class WordService {
 
     const prng = createSeededRandom(stageNumber * 997 + 13);
 
-    // [핵심] 공백/특수문자 없이 정확히 4글자, 3글자인 순수 단어만 필터링
     const raw4 = this.db['4'] || this.db[4] || [];
     const raw3 = this.db['3'] || this.db[3] || [];
 
+    // 완벽한 4음절, 3음절 순수 한글 필터링
     const words4 = raw4
       .map((w) => w.trim())
       .filter((w) => w.length === 4 && /^[가-힣]+$/.test(w))
@@ -44,28 +44,26 @@ class WordService {
       .sort();
 
     if (words4.length < 2 || words3.length < 4) {
-      throw new Error(`정제된 단어 풀이 부족합니다. (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
+      throw new Error(`단어 풀 부족 (4음절: ${words4.length}, 3음절: ${words3.length})`);
     }
 
     const chosen: string[] = [];
 
-    // 4음절 단어 정확히 2개 선택 (총 8칸)
+    // 4음절 2개
     const pool4 = [...words4];
     for (let i = 0; i < 2; i++) {
       const idx = Math.floor(prng() * pool4.length);
-      const sel = pool4.splice(idx, 1)[0];
-      if (sel) chosen.push(sel);
+      chosen.push(pool4.splice(idx, 1)[0]);
     }
 
-    // 3음절 단어 정확히 4개 선택 (총 12칸)
+    // 3음절 4개
     const pool3 = [...words3];
     for (let i = 0; i < 4; i++) {
       const idx = Math.floor(prng() * pool3.length);
-      const sel = pool3.splice(idx, 1)[0];
-      if (sel) chosen.push(sel);
+      chosen.push(pool3.splice(idx, 1)[0]);
     }
 
-    return chosen; // 정확히 6개 단어, 총합 20자
+    return chosen;
   }
 }
 
