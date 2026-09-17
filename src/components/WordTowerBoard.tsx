@@ -5,7 +5,7 @@ import type { StageData } from '../types/game';
 interface Props {
   stage: StageData;
   stageNumber: number;
-  chapterNumber?: number; // 추가
+  chapterNumber?: number;
   onClear: () => void;
   onReset: () => void;
   onOpenMenu: () => void;
@@ -14,6 +14,7 @@ interface Props {
 export const WordTowerBoard: React.FC<Props> = ({
   stage,
   stageNumber,
+  chapterNumber = 1,
   onClear,
   onReset,
   onOpenMenu,
@@ -22,10 +23,14 @@ export const WordTowerBoard: React.FC<Props> = ({
   const engineRef = useRef<PixiWordEngine | null>(null);
   const [clearedWords, setClearedWords] = useState<string[]>([]);
 
+  // 힌트 모달 상태
   const [isHintModalOpen, setIsHintModalOpen] = useState(false);
   const [hintPassword, setHintPassword] = useState('');
   const [hintIndex, setHintIndex] = useState(0);
   const [hintError, setHintError] = useState(false);
+
+  // 게임 설명서 모달 상태
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -89,7 +94,6 @@ export const WordTowerBoard: React.FC<Props> = ({
       <div style={{ width: '100%', maxWidth: '380px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {/* 스테이지 선택 폴백 메뉴 버튼 */}
             <button
               onClick={onOpenMenu}
               title="스테이지 선택"
@@ -104,19 +108,19 @@ export const WordTowerBoard: React.FC<Props> = ({
                 cursor: 'pointer',
               }}
             >
-              STAGE {stageNumber} ☰
+              CH.{chapterNumber} - STAGE {stageNumber} ☰
             </button>
             <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#60a5fa', margin: 0 }}>
               워드타워
             </h1>
           </div>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: '3px 0 0 0' }}>
-            숨겨진 단어를 드래그하여 완성하세요
+            숨겨진 6개 단어를 드래그해 완성하세요
           </p>
         </div>
 
-        {/* 카운터, 힌트, 다시하기 (높이 48px 완전 동기화) */}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch', height: '48px' }}>
+        {/* 남은 단어, 설명서, 힌트, 다시하기 컨트롤러 그룹 */}
+        <div style={{ display: 'flex', gap: '5px', alignItems: 'stretch', height: '48px' }}>
           <div
             style={{
               display: 'flex',
@@ -126,17 +130,39 @@ export const WordTowerBoard: React.FC<Props> = ({
               background: '#1e293b',
               border: '2px solid #3b82f6',
               borderRadius: '10px',
-              padding: '0 10px',
-              minWidth: '64px',
+              padding: '0 8px',
+              minWidth: '58px',
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, lineHeight: 1 }}>남은 단어</span>
-            <span style={{ fontSize: '18px', fontWeight: 800, color: '#60a5fa', lineHeight: 1, marginTop: '3px' }}>
+            <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600, lineHeight: 1 }}>남은 단어</span>
+            <span style={{ fontSize: '17px', fontWeight: 800, color: '#60a5fa', lineHeight: 1, marginTop: '3px' }}>
               {remainingCount}
             </span>
           </div>
 
+          {/* 게임 설명서 버튼 */}
+          <button
+            onClick={() => setIsHelpModalOpen(true)}
+            title="게임 설명서"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#1e293b',
+              border: '1px solid #38bdf8',
+              color: '#38bdf8',
+              borderRadius: '10px',
+              padding: '0 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+            }}
+          >
+            ❓
+          </button>
+
+          {/* 힌트 버튼 */}
           <button
             onClick={() => {
               setIsHintModalOpen(true);
@@ -151,8 +177,8 @@ export const WordTowerBoard: React.FC<Props> = ({
               border: '1px solid #eab308',
               color: '#eab308',
               borderRadius: '10px',
-              padding: '0 12px',
-              fontSize: '18px',
+              padding: '0 10px',
+              fontSize: '16px',
               cursor: 'pointer',
               boxSizing: 'border-box',
             }}
@@ -160,6 +186,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             💡
           </button>
 
+          {/* 다시하기 버튼 */}
           <button
             onClick={onReset}
             title="다시 하기"
@@ -171,8 +198,8 @@ export const WordTowerBoard: React.FC<Props> = ({
               border: '1px solid #334155',
               color: '#94a3b8',
               borderRadius: '10px',
-              padding: '0 12px',
-              fontSize: '18px',
+              padding: '0 10px',
+              fontSize: '16px',
               cursor: 'pointer',
               boxSizing: 'border-box',
             }}
@@ -187,7 +214,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         ref={containerRef}
         style={{
           width: '360px',
-          height: '400px',
+          height: '450px',
           backgroundColor: '#0f172a',
           borderRadius: '16px',
           border: '1px solid #334155',
@@ -195,6 +222,83 @@ export const WordTowerBoard: React.FC<Props> = ({
           touchAction: 'none',
         }}
       />
+
+      {/* 게임 설명서 모달 */}
+      {isHelpModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(2, 6, 23, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 80,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            style={{
+              background: '#0f172a',
+              border: '1px solid #38bdf8',
+              borderRadius: '20px',
+              padding: '24px 20px',
+              width: '90%',
+              maxWidth: '340px',
+              boxShadow: '0 25px 50px -12px rgba(56, 189, 248, 0.25)',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <span style={{ fontSize: '24px' }}>📜</span>
+              <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#38bdf8', margin: 0 }}>
+                워드타워 게임 설명서
+              </h3>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#cbd5e1', lineHeight: '1.5' }}>
+              <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #38bdf8' }}>
+                <strong style={{ color: '#f8fafc' }}>1. 단어 연결 규칙</strong>
+                <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
+                  손가락이나 마우스로 <strong>상하좌우·대각선(8방향)</strong> 인접한 글자들을 이어서 숨겨진 단어를 드래그하세요.
+                </p>
+              </div>
+
+              <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #f59e0b' }}>
+                <strong style={{ color: '#f8fafc' }}>2. 타워 중력 법칙 (핵심!)</strong>
+                <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
+                  단어가 맞춰지면 타일이 사라지고 위의 글자들이 아래로 떨어집니다. <strong>순서를 잘못 맞추면 글자가 끊겨 클리어가 불가능</strong>해질 수 있습니다.
+                </p>
+              </div>
+
+              <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #10b981' }}>
+                <strong style={{ color: '#f8fafc' }}>3. 막혔을 때의 팁</strong>
+                <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
+                  순서가 꼬였다면 <strong>↺ (다시하기)</strong> 버튼으로 초기 배치로 되돌리세요. 첫 글자가 안 보일 땐 <strong>💡 (힌트)</strong>를 활용할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsHelpModalOpen(false)}
+              style={{
+                width: '100%',
+                marginTop: '18px',
+                padding: '11px',
+                background: '#0284c7',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: '14px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              이해했습니다
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 힌트 모달 */}
       {isHintModalOpen && (
@@ -226,7 +330,6 @@ export const WordTowerBoard: React.FC<Props> = ({
               암호를 입력하면 첫 글자를 짚어줍니다.
             </p>
 
-            {/* 희미한 글씨로 힌트 암호가 보이도록 처리된 입력창 */}
             <input
               type="text"
               value={hintPassword}
@@ -244,7 +347,6 @@ export const WordTowerBoard: React.FC<Props> = ({
                 outline: 'none',
                 marginBottom: hintError ? '6px' : '14px',
               }}
-              className="placeholder:text-slate-600 placeholder:opacity-50"
               onKeyDown={(e) => e.key === 'Enter' && handleApplyHint()}
             />
 
