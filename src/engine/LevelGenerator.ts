@@ -5,8 +5,7 @@ export class LevelGenerator {
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
     const words = wordService.getStageWordsForSeed(stageNumber);
 
-    // 100번의 결정론적 시도로 최적의 인접 배치 생성
-    for (let attempt = 0; attempt < 100; attempt++) {
+    for (let attempt = 0; attempt < 50; attempt++) {
       const prng = createSeededRandom(stageNumber * 1009 + 37 + attempt * 23);
       const grid = this.tryGenerate(rows, cols, words, prng);
       if (grid) {
@@ -19,7 +18,6 @@ export class LevelGenerator {
       }
     }
 
-    // 최악의 경우에도 단절 없는 연속 뱀 모양 배치 보장
     const fallbackGrid = this.guaranteedSnakeGenerate(rows, cols, words);
     return {
       rows,
@@ -88,7 +86,7 @@ export class LevelGenerator {
             grid[r][c] = {
               id: `cell_${r}_${c}`,
               char: word[charIdx],
-              word: word,
+              word,
               wordIndex: wordIdx,
               charIndex: charIdx,
               row: r,
@@ -106,12 +104,10 @@ export class LevelGenerator {
     return grid as GridData;
   }
 
-  // 절대 끊어지지 않는 바운드 보장 뱀형 배치 (모든 셀이 이전 셀과 상하좌우로 100% 인접)
   private guaranteedSnakeGenerate(rows: number, cols: number, words: string[]): GridData {
     const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
     const continuousPath: [number, number][] = [];
 
-    // 바운더리 넘김 없는 완벽한 Boustrophedon(지그재그) 연속 좌표열
     for (let r = 0; r < rows; r++) {
       if (r % 2 === 0) {
         for (let c = 0; c < cols; c++) continuousPath.push([r, c]);
@@ -127,7 +123,7 @@ export class LevelGenerator {
         grid[r][c] = {
           id: `cell_${r}_${c}`,
           char: word[charIdx],
-          word: word,
+          word,
           wordIndex: wordIdx,
           charIndex: charIdx,
           row: r,
