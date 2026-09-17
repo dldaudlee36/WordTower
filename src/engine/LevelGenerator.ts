@@ -1,5 +1,5 @@
 import type { StageData, GridData, TileData } from '../types/game';
-import { wordService } from '../services/wordService';
+import { wordService, createSeededRandom } from '../services/wordService';
 
 export class LevelGenerator {
   private readonly directions = [
@@ -7,60 +7,56 @@ export class LevelGenerator {
     [-1, -1], [-1, 1], [1, -1], [1, 1]
   ];
 
-  public createStage(rows = 5, cols = 4, maxAttempts = 100): StageData {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // 6단어(4음절 2개, 3음절 4개 = 20글자) 추출
-      const words = wordService.pickStageWordsFor20Cells();
-      const grid = this.tryGenerateGrid(rows, cols, words);
-      if (grid) {
-        return {
-          rows,
-          cols,
-          targetWords: words,
-          grid
-        };
-      }
+  public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
+    const words = wordService.getStageWordsForSeed(stageNumber);
+    const prng = createSeededRandom(stageNumber * 1009 + 37);
+
+    const grid = this.generateGridWithSeed(rows, cols, words, prng);
+    if (!grid) {
+      throw new Error(`스테이지 ${stageNumber} 배치 생성 실패`);
     }
 
-    throw new Error('레벨 생성 실패: 유효한 퍼즐 배치를 찾지 못했습니다.');
+    return {
+      rows,
+      cols,
+      targetWords: words,
+      grid
+    };
   }
 
-  private tryGenerateGrid(rows: number, cols: number, words: string[]): GridData | null {
-    const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
-    const reversedWords = [...words].reverse();
-    const success = this.backtrackPlaceWords(grid, rows, cols, reversedWords, 0, words);
-    return success ? grid : null;
-  }
-
-  private backtrackPlaceWords(
-    grid: (TileData | null)[][],
+  private generateGridWithSeed(
     rows: number,
     cols: number,
     words: string[],
-    wordIndex: number,
-    originalWords: string[]
-  ): boolean {
-    if (wordIndex >= words.length) return true;
+    prng: () => number
+  ): GridData | null {
+    const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
 
-    const currentWord = words[wordIndex];
-    const actualWordId = originalWords.indexOf(currentWord);
+    const backtrack = (wordIdx: number): boolean => {
+      if (wordIdx >= words.length) return true;
+      const word = words[wordIdx];
 
-    const startPositions = this.getValidPlacements(grid, rows, cols);
-    this.shuffle(startPositions);
-
-    for (const [startR, startC] of startPositions) {
-      const path: [number, number][] = [[startR, startC]];
-      if (this.dfsPlaceLetters(grid, rows, cols, currentWord, 1, path, actualWordId)) {
-        if (this.backtrackPlaceWords(grid, rows, cols, words, wordIndex + 1, originalWords)) {
-          return true;
-        }
-        for (const [r, c] of path) {
-          grid[r][c] = null;
+      // 빈 칸 좌표 탐색
+      const emptyCells: [number, number][] = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (grid[r][c] === null) emptyCells.push([r, c]);
         }
       }
-    }
+      this.shuffleWithSeed(emptyCells, prng);
 
-    return false;
+      for (const [sr, sc] of emptyCells) {
+        const path: [number, number][] = [[sr, sc]];
+        if (this.dfsPlaceLetters(grid, rows, cols, word, 1, path, wordIdx, prng)) {
+          if (backtrack(wordIdx + 1)) return true;
+          // 실패 시 롤백
+          for (const [pr, pc] of path) grid[pr][pc] = null;
+        }
+      }
+      return false;
+    };
+
+    return backtrack(0) ? grid : null;
   }
 
   private dfsPlaceLetters(
@@ -70,7 +66,8 @@ export class LevelGenerator {
     word: string,
     charIndex: number,
     path: [number, number][],
-    wordId: number
+    wordId: number,
+    prng: () => number
   ): boolean {
     if (charIndex >= word.length) {
       path.forEach(([r, c], idx) => {
@@ -85,29 +82,26 @@ export class LevelGenerator {
       return true;
     }
 
-    const [prevR, prevC] = path[path.length - 1];
+    const [pr, pc] = path[path.length - 1];
     const neighbors: [number, number][] = [];
 
     for (const [dr, dc] of this.directions) {
-      const nr = prevR + dr;
-      const nc = prevC + dc;
-
+      const nr = pr + dr;
+      const nc = pc + dc;
       if (
         nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
         grid[nr][nc] === null &&
-        !path.some(([pr, pc]) => pr === nr && pc === nc)
+        !path.some(([xr, xc]) => xr === nr && xc === nc)
       ) {
-        if (this.isPhysicallySupported(grid, rows, path, nr, nc)) {
-          neighbors.push([nr, nc]);
-        }
+        neighbors.push([nr, nc]);
       }
     }
 
-    this.shuffle(neighbors);
+    this.shuffleWithSeed(neighbors, prng);
 
     for (const [nr, nc] of neighbors) {
       path.push([nr, nc]);
-      if (this.dfsPlaceLetters(grid, rows, cols, word, charIndex + 1, path, wordId)) {
+      if (this.dfsPlaceLetters(grid, rows, cols, word, charIndex + 1, path, wordId, prng)) {
         return true;
       }
       path.pop();
@@ -116,34 +110,9 @@ export class LevelGenerator {
     return false;
   }
 
-  private isPhysicallySupported(
-    grid: (TileData | null)[][],
-    rows: number,
-    path: [number, number][],
-    r: number,
-    c: number
-  ): boolean {
-    if (r === rows - 1) return true;
-    const isBelowOccupied = grid[r + 1][c] !== null;
-    const isBelowInPath = path.some(([pr, pc]) => pr === r + 1 && pc === c);
-    return isBelowOccupied || isBelowInPath;
-  }
-
-  private getValidPlacements(grid: (TileData | null)[][], rows: number, cols: number): [number, number][] {
-    const list: [number, number][] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (grid[r][c] === null && this.isPhysicallySupported(grid, rows, [], r, c)) {
-          list.push([r, c]);
-        }
-      }
-    }
-    return list;
-  }
-
-  private shuffle(array: any[]) {
+  private shuffleWithSeed<T>(array: T[], prng: () => number) {
     for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(prng() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
     }
   }
