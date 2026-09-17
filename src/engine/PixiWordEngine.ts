@@ -30,8 +30,10 @@ export class PixiWordEngine {
   private container: HTMLElement;
   private rows: number;
   private cols: number;
-  private tileSize: number = 65;
-  private tileGap: number = 8;
+
+  // 폰트 크기는 28px 유지, 타일 크기는 줄이고 간격은 2배로 확장
+  private tileSize: number = 58;
+  private tileGap: number = 16;
 
   private boardContainer: Container;
   private lineGraphics: Graphics;
@@ -107,7 +109,7 @@ export class PixiWordEngine {
         const isCleared = this.clearedTileIds.has(tile.id);
 
         const bg = new Graphics();
-        bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+        bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
 
         if (isCleared) {
           bg.fill({ color: 0x050811, alpha: 0.6 });
@@ -160,6 +162,9 @@ export class PixiWordEngine {
     const localX = screenX - this.boardContainer.x;
     const localY = screenY - this.boardContainer.y;
 
+    // 타일 경계면 오인식 방지를 위한 4px 히트박스 패딩 마진
+    const hitPadding = 4;
+
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
@@ -168,7 +173,12 @@ export class PixiWordEngine {
         const tx = c * (this.tileSize + this.tileGap);
         const ty = r * (this.tileSize + this.tileGap);
 
-        if (localX >= tx && localX <= tx + this.tileSize && localY >= ty && localY <= ty + this.tileSize) {
+        if (
+          localX >= tx + hitPadding &&
+          localX <= tx + this.tileSize - hitPadding &&
+          localY >= ty + hitPadding &&
+          localY <= ty + this.tileSize - hitPadding
+        ) {
           this.trySelectTile(tile);
           return;
         }
@@ -204,7 +214,7 @@ export class PixiWordEngine {
     const sprite = this.tileSprites.get(tile.id);
     if (!sprite) return;
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
 
     if (isSelected) {
       sprite.bg.fill({ color: 0x2563eb, alpha: 1 });
@@ -245,7 +255,7 @@ export class PixiWordEngine {
         const sprite = this.tileSprites.get(id);
         if (sprite) {
           sprite.bg.clear();
-          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
           sprite.bg.fill({ color: 0x050811, alpha: 0.6 });
           sprite.text.style = CLEARED_TEXT_STYLE.clone();
           sprite.text.alpha = 0.3;
@@ -290,7 +300,7 @@ export class PixiWordEngine {
     if (!sprite) return false;
 
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
     sprite.bg.fill({ color: 0xeab308, alpha: 1 });
     sprite.bg.stroke({ width: 2.5, color: 0xfef08a });
 
