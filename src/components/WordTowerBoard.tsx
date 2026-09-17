@@ -24,8 +24,7 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  // 버전 v6로 갱신 (오염 데이터 완전 배제)
-  const storageKey = `wt_cleared_words_v6_stage_${globalStageNumber}`;
+  const storageKey = `wt_cleared_words_v7_stage_${globalStageNumber}`;
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
@@ -106,7 +105,6 @@ export const WordTowerBoard: React.FC<Props> = ({
           [targetWord]: nextRevealed,
         }));
 
-        // 정확한 글자 위치(charIndex)로 힌트 전송
         engineRef.current.showHintForWord(targetWord, currentRevealed);
       }
       setIsHintModalOpen(false);
@@ -143,7 +141,6 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* 상단 헤더 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -259,7 +256,6 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 힌트 슬롯 (4글자 2개, 3글자 4개) */}
         <div
           style={{
             display: 'grid',
@@ -323,7 +319,6 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 캔버스 영역 */}
       <div
         ref={containerRef}
         style={{
@@ -337,7 +332,6 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
-      {/* 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
@@ -414,7 +408,6 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* 힌트 모달 */}
       {isHintModalOpen && (
         <div
           style={{
