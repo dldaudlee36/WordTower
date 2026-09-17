@@ -44,7 +44,7 @@ export class PixiWordEngine {
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
-    // 맞춘 단어 목록에 포함된 타일들을 ID 기반으로 정확히 추출하여 Set에 등록
+    // 맞춘 단어 타일만 추출하여 비활성화 목록에 등록
     initialClearedWords.forEach((clearedWord) => {
       for (let r = 0; r < this.rows; r++) {
         for (let c = 0; c < this.cols; c++) {
@@ -58,9 +58,9 @@ export class PixiWordEngine {
 
     await this.app.init({
       resizeTo: this.container,
-      backgroundColor: 0x0f172a,
+      backgroundColor: 0x070b14, // 전체 배경을 더 어둡게 하여 활성 타일 강조
       antialias: true,
-      resolution: window.devicePixelRatio || 1,
+      resolution: window.devicePixelRatio || 2, // 해상도 2배로 텍스트 뭉개짐 방지
       autoDensity: true,
     });
 
@@ -81,18 +81,21 @@ export class PixiWordEngine {
   }
 
   private renderTiles() {
+    // 1. [핵심] 안 맞춘 타일: 쨍하고 굵은 100% 순백색 폰트
     const activeTextStyle = new TextStyle({
-      fontSize: 26,
+      fontSize: 28,
       fill: '#ffffff',
       fontWeight: '900',
-      fontFamily: 'sans-serif',
+      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      stroke: { color: '#0f172a', width: 2 }, // 외곽선으로 또렷함 극대화
     });
 
+    // 2. 맞춘 타일: 완전히 불 꺼진 어두운 폰트
     const clearedTextStyle = new TextStyle({
       fontSize: 26,
-      fill: '#334155',
+      fill: '#1e293b',
       fontWeight: 'bold',
-      fontFamily: 'sans-serif',
+      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     });
 
     for (let r = 0; r < this.rows; r++) {
@@ -108,21 +111,22 @@ export class PixiWordEngine {
         const isCleared = this.clearedTileIds.has(tile.id);
 
         const bg = new Graphics();
-        bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
+        bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
 
         if (isCleared) {
-          // 맞춘 타일: 어두운 배경 + 테두리 없음
-          bg.fill(0x090d16);
+          // 맞춘 타일: 완전히 꺼진 먹색
+          bg.fill({ color: 0x050811, alpha: 0.6 });
         } else {
-          // 미해결 타일: 선명한 네이비 + 테두리
-          bg.fill(0x1e293b);
-          bg.stroke({ width: 1.5, color: 0x475569 });
+          // [핵심] 안 맞춘 타일: 밝고 뚜렷한 슬레이트 블루 + 선명한 하늘색 테두리
+          bg.fill({ color: 0x334155, alpha: 1 });
+          bg.stroke({ width: 2, color: 0x64748b, alpha: 0.9 });
         }
 
         const txt = new Text({
           text: tile.char,
           style: isCleared ? clearedTextStyle : activeTextStyle,
         });
+        txt.alpha = isCleared ? 0.35 : 1.0;
         txt.anchor.set(0.5);
         txt.position.set(this.tileSize / 2, this.tileSize / 2);
 
@@ -165,7 +169,6 @@ export class PixiWordEngine {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
-        // 이미 맞춘 타일은 선택 대상에서 제외
         if (!tile || this.clearedTileIds.has(tile.id)) continue;
 
         const tx = c * (this.tileSize + this.tileGap);
@@ -207,13 +210,16 @@ export class PixiWordEngine {
     const sprite = this.tileSprites.get(tile.id);
     if (!sprite) return;
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+
     if (isSelected) {
-      sprite.bg.fill(0x2563eb);
-      sprite.bg.stroke({ width: 2, color: 0x60a5fa });
+      // 드래그 중인 타일: 쨍한 파란색
+      sprite.bg.fill({ color: 0x2563eb, alpha: 1 });
+      sprite.bg.stroke({ width: 2.5, color: 0x93c5fd });
     } else {
-      sprite.bg.fill(0x1e293b);
-      sprite.bg.stroke({ width: 1.5, color: 0x475569 });
+      // 선택 해제 시: 원래의 밝고 뚜렷한 슬레이트 블루로 복귀
+      sprite.bg.fill({ color: 0x334155, alpha: 1 });
+      sprite.bg.stroke({ width: 2, color: 0x64748b, alpha: 0.9 });
     }
   }
 
@@ -221,7 +227,7 @@ export class PixiWordEngine {
     this.lineGraphics.clear();
     if (this.selectedTiles.length < 2) return;
 
-    this.lineGraphics.setStrokeStyle({ width: 5, color: 0x60a5fa, alpha: 0.9 });
+    this.lineGraphics.setStrokeStyle({ width: 6, color: 0x38bdf8, alpha: 0.95 });
     this.selectedTiles.forEach((tile, index) => {
       const x = tile.col * (this.tileSize + this.tileGap) + this.tileSize / 2;
       const y = tile.row * (this.tileSize + this.tileGap) + this.tileSize / 2;
@@ -242,19 +248,22 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      // 맞춘 타일들만 즉시 음영 처리 및 선택 불능화
+      // 정답인 타일들만 완전 소등(어두운 먹색) 처리
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
         if (sprite) {
           sprite.bg.clear();
-          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
-          sprite.bg.fill(0x090d16); // 꺼진 배경
-          sprite.text.style.fill = '#334155'; // 어두운 텍스트
-          gsap.fromTo(sprite.container.scale, { x: 1.08, y: 1.08 }, { x: 1, y: 1, duration: 0.15 });
+          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+          sprite.bg.fill({ color: 0x050811, alpha: 0.6 });
+          sprite.text.style.fill = '#1e293b';
+          sprite.text.style.stroke = { color: 'transparent', width: 0 };
+          sprite.text.alpha = 0.35;
+          gsap.fromTo(sprite.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.15 });
         }
       });
     } else {
+      // 오답 시: 원래의 밝은 슬레이트 색상으로 복구
       this.selectedTiles.forEach((t) => {
         const sprite = this.tileSprites.get(t.id);
         if (sprite) {
@@ -287,9 +296,9 @@ export class PixiWordEngine {
     if (!sprite) return false;
 
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
-    sprite.bg.fill(0xeab308);
-    sprite.bg.stroke({ width: 2, color: 0xfde047 });
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
+    sprite.bg.fill({ color: 0xeab308, alpha: 1 });
+    sprite.bg.stroke({ width: 2.5, color: 0xfef08a });
 
     gsap.fromTo(
       sprite.container.scale,
