@@ -4,90 +4,89 @@ import { LevelGenerator } from './engine/LevelGenerator';
 import { wordService } from './services/wordService';
 import type { StageData } from './types/game';
 
+const TOTAL_CHAPTERS = 40;
+const STAGES_PER_CHAPTER = 20;
+const TOTAL_STAGES = TOTAL_CHAPTERS * STAGES_PER_CHAPTER; // 800
+
 export default function App() {
-  // [1] 모든 State 및 Hook은 반드시 컴포넌트 최상단에 일괄 선언
   const [isDbLoaded, setIsDbLoaded] = useState(false);
-  const [currentStageIdx, setCurrentStageIdx] = useState(0);
-  const [stageHistory, setStageHistory] = useState<StageData[]>([]);
+  const [currentGlobalStage, setCurrentGlobalStage] = useState(1); // 1 ~ 800
+  const [stageHistory, setStageHistory] = useState<Record<number, StageData>>({});
   const [isStageCleared, setIsStageCleared] = useState(false);
   const [gameKey, setGameKey] = useState(0);
+  
+  // 메뉴 네비게이션 상태
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedChapterTab, setSelectedChapterTab] = useState(1);
 
-  // 로컬스토리지 연동 최고 해금 스테이지 (단 1번만 최상단에 선언)
+  // 최고 해금 스테이지 (로컬스토리지 연동)
   const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
-    const saved = localStorage.getItem('wt_max_stage');
+    const saved = localStorage.getItem('wt_max_stage_v2');
     return saved ? parseInt(saved, 10) : 1;
   });
 
   const generator = useMemo(() => new LevelGenerator(), []);
 
-  // [2] Effect 훅
   useEffect(() => {
     wordService.loadDatabase()
       .then(() => setIsDbLoaded(true))
       .catch((err) => console.error('단어 DB 로드 실패:', err));
   }, []);
 
-  // [3] Memo 훅: 현재 스테이지 연산
+  // 현재 스테이지 생성 (5행 4열, 20칸, 정확히 6단어)
   const currentStage: StageData | null = useMemo(() => {
     if (!isDbLoaded) return null;
 
-    if (stageHistory[currentStageIdx]) {
-      return stageHistory[currentStageIdx];
+    if (stageHistory[currentGlobalStage]) {
+      return stageHistory[currentGlobalStage];
     }
 
-    const stageNum = currentStageIdx + 1;
-    const isSmall = stageNum <= 3;
-    const rows = isSmall ? 3 : 4;
-    const cols = isSmall ? 3 : 4;
-    const newStage = generator.createStage(rows, cols);
+    const newStage = generator.createStage(5, 4);
 
-    setStageHistory((prev) => {
-      const next = [...prev];
-      next[currentStageIdx] = newStage;
-      return next;
-    });
+    setStageHistory((prev) => ({
+      ...prev,
+      [currentGlobalStage]: newStage,
+    }));
 
     return newStage;
-  }, [isDbLoaded, currentStageIdx, gameKey, generator, stageHistory]);
+  }, [isDbLoaded, currentGlobalStage, gameKey, generator, stageHistory]);
 
-  // [4] 핸들러 함수들
+  const currentChapter = Math.ceil(currentGlobalStage / STAGES_PER_CHAPTER);
+  const stageInChapter = ((currentGlobalStage - 1) % STAGES_PER_CHAPTER) + 1;
+
   const handleStageClear = () => {
     setIsStageCleared(true);
-    const nextStage = currentStageIdx + 2;
-    if (nextStage > maxUnlockedStage) {
+    const nextStage = currentGlobalStage + 1;
+    if (nextStage > maxUnlockedStage && nextStage <= TOTAL_STAGES) {
       setMaxUnlockedStage(nextStage);
-      localStorage.setItem('wt_max_stage', nextStage.toString());
+      localStorage.setItem('wt_max_stage_v2', nextStage.toString());
     }
   };
 
   const handleNextStage = () => {
-    setCurrentStageIdx((prev) => prev + 1);
-    setIsStageCleared(false);
-    setGameKey((prev) => prev + 1);
+    if (currentGlobalStage < TOTAL_STAGES) {
+      setCurrentGlobalStage((prev) => prev + 1);
+      setIsStageCleared(false);
+      setGameKey((prev) => prev + 1);
+    }
   };
 
-  const handleSelectStage = (index: number) => {
-    setCurrentStageIdx(index);
+  const handleSelectStage = (globalStageNum: number) => {
+    setCurrentGlobalStage(globalStageNum);
     setIsStageCleared(false);
     setIsMenuOpen(false);
     setGameKey((prev) => prev + 1);
   };
 
   const handleResetStage = () => {
-    const stageNum = currentStageIdx + 1;
-    const isSmall = stageNum <= 3;
-    const newStage = generator.createStage(isSmall ? 3 : 4, isSmall ? 3 : 4);
-    
-    setStageHistory((prev) => {
-      const next = [...prev];
-      next[currentStageIdx] = newStage;
-      return next;
-    });
+    const newStage = generator.createStage(5, 4);
+    setStageHistory((prev) => ({
+      ...prev,
+      [currentGlobalStage]: newStage,
+    }));
     setGameKey((prev) => prev + 1);
   };
 
-  // [5] 훅 선언이 모두 끝난 후 조기 반환(Early Return) 처리
   if (!isDbLoaded || !currentStage) {
     return (
       <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -96,10 +95,10 @@ export default function App() {
     );
   }
 
-  // [6] 메인 렌더링
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {/* 폴백 메뉴 모달 */}
+      
+      {/* 40챕터 x 20스테이지 폴백 네비게이터 모달 */}
       {isMenuOpen && (
         <div
           style={{
@@ -118,48 +117,93 @@ export default function App() {
               background: '#0f172a',
               border: '1px solid #3b82f6',
               borderRadius: '20px',
-              padding: '24px',
-              width: '90%',
-              maxWidth: '340px',
+              padding: '20px',
+              width: '92%',
+              maxWidth: '380px',
               textAlign: 'center',
             }}
           >
-            <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#60a5fa', margin: '0 0 16px 0' }}>
-              스테이지 목록
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#60a5fa', margin: 0 }}>
+                챕터 & 스테이지 선택
+              </h3>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                해금: {maxUnlockedStage} / 800
+              </span>
+            </div>
+
+            {/* 챕터 탭 슬라이더 (1~40) */}
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '8px',
-                maxHeight: '260px',
-                overflowY: 'auto',
-                marginBottom: '20px',
-                padding: '4px',
+                display: 'flex',
+                gap: '6px',
+                overflowX: 'auto',
+                paddingBottom: '8px',
+                marginBottom: '12px',
               }}
             >
-              {Array.from({ length: maxUnlockedStage }).map((_, idx) => {
-                const isCurrent = idx === currentStageIdx;
+              {Array.from({ length: TOTAL_CHAPTERS }).map((_, idx) => {
+                const chap = idx + 1;
+                const isSelected = chap === selectedChapterTab;
                 return (
                   <button
-                    key={idx}
-                    onClick={() => handleSelectStage(idx)}
+                    key={chap}
+                    onClick={() => setSelectedChapterTab(chap)}
                     style={{
-                      padding: '12px 0',
-                      borderRadius: '10px',
-                      border: isCurrent ? '2px solid #3b82f6' : '1px solid #334155',
-                      background: isCurrent ? '#2563eb' : '#1e293b',
-                      color: isCurrent ? '#fff' : '#94a3b8',
-                      fontWeight: 800,
-                      fontSize: '14px',
+                      flexShrink: 0,
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: isSelected ? '1px solid #3b82f6' : '1px solid #334155',
+                      background: isSelected ? '#2563eb' : '#1e293b',
+                      color: isSelected ? '#fff' : '#94a3b8',
+                      fontSize: '12px',
+                      fontWeight: 700,
                       cursor: 'pointer',
                     }}
                   >
-                    {idx + 1}
+                    Ch.{chap}
                   </button>
                 );
               })}
             </div>
+
+            {/* 선택된 챕터 내 20개 스테이지 그리드 */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: '8px',
+                marginBottom: '16px',
+              }}
+            >
+              {Array.from({ length: STAGES_PER_CHAPTER }).map((_, idx) => {
+                const stageNumInChap = idx + 1;
+                const globalNum = (selectedChapterTab - 1) * STAGES_PER_CHAPTER + stageNumInChap;
+                const isUnlocked = globalNum <= maxUnlockedStage;
+                const isCurrent = globalNum === currentGlobalStage;
+
+                return (
+                  <button
+                    key={globalNum}
+                    disabled={!isUnlocked}
+                    onClick={() => handleSelectStage(globalNum)}
+                    style={{
+                      padding: '10px 0',
+                      borderRadius: '8px',
+                      border: isCurrent ? '2px solid #60a5fa' : '1px solid #334155',
+                      background: isCurrent ? '#2563eb' : isUnlocked ? '#1e293b' : '#090d16',
+                      color: isCurrent ? '#fff' : isUnlocked ? '#e2e8f0' : '#475569',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {isUnlocked ? stageNumInChap : '🔒'}
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               onClick={() => setIsMenuOpen(false)}
               style={{
@@ -210,7 +254,7 @@ export default function App() {
               STAGE CLEAR!
             </h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 24px 0' }}>
-              스테이지 {currentStageIdx + 1} 완료!
+              챕터 {currentChapter} - 스테이지 {stageInChapter} 완료!
             </p>
 
             <button
@@ -233,14 +277,18 @@ export default function App() {
         </div>
       )}
 
-      {/* 게임 보드 마운트 */}
+      {/* 게임 보드 */}
       <WordTowerBoard
         key={gameKey}
         stage={currentStage}
-        stageNumber={currentStageIdx + 1}
+        stageNumber={stageInChapter}
+        chapterNumber={currentChapter}
         onClear={handleStageClear}
         onReset={handleResetStage}
-        onOpenMenu={() => setIsMenuOpen(true)}
+        onOpenMenu={() => {
+          setSelectedChapterTab(currentChapter);
+          setIsMenuOpen(true);
+        }}
       />
     </main>
   );

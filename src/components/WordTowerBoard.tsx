@@ -5,9 +5,10 @@ import type { StageData } from '../types/game';
 interface Props {
   stage: StageData;
   stageNumber: number;
+  chapterNumber?: number; // 추가
   onClear: () => void;
   onReset: () => void;
-  onOpenMenu: () => void; // 폴백 메뉴 트리거
+  onOpenMenu: () => void;
 }
 
 export const WordTowerBoard: React.FC<Props> = ({

@@ -7,11 +7,10 @@ export class LevelGenerator {
     [-1, -1], [-1, 1], [1, -1], [1, 1]
   ];
 
-  public createStage(rows: number, cols: number, maxAttempts = 50): StageData {
-    const totalCells = rows * cols;
-
+  public createStage(rows = 5, cols = 4, maxAttempts = 100): StageData {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const words = wordService.pickRandomWords(totalCells);
+      // 6단어(4음절 2개, 3음절 4개 = 20글자) 추출
+      const words = wordService.pickStageWordsFor20Cells();
       const grid = this.tryGenerateGrid(rows, cols, words);
       if (grid) {
         return {
@@ -23,10 +22,9 @@ export class LevelGenerator {
       }
     }
 
-    throw new Error('레벨 생성 실패: 유효한 단어 배치를 찾지 못했습니다.');
+    throw new Error('레벨 생성 실패: 유효한 퍼즐 배치를 찾지 못했습니다.');
   }
 
-  // (이하 tryGenerateGrid, backtrackPlaceWords 등 기존 내부 로직 유지)
   private tryGenerateGrid(rows: number, cols: number, words: string[]): GridData | null {
     const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
     const reversedWords = [...words].reverse();
