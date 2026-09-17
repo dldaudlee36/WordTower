@@ -6,20 +6,17 @@ import type { StageData } from './types/game';
 
 const TOTAL_CHAPTERS = 40;
 const STAGES_PER_CHAPTER = 20;
-const TOTAL_STAGES = TOTAL_CHAPTERS * STAGES_PER_CHAPTER; // 800
+const TOTAL_STAGES = TOTAL_CHAPTERS * STAGES_PER_CHAPTER;
 
 export default function App() {
   const [isDbLoaded, setIsDbLoaded] = useState(false);
-  const [currentGlobalStage, setCurrentGlobalStage] = useState(1); // 1 ~ 800
-  const [stageHistory, setStageHistory] = useState<Record<number, StageData>>({});
+  const [currentGlobalStage, setCurrentGlobalStage] = useState(1);
   const [isStageCleared, setIsStageCleared] = useState(false);
   const [gameKey, setGameKey] = useState(0);
-  
-  // 메뉴 네비게이션 상태
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedChapterTab, setSelectedChapterTab] = useState(1);
 
-  // 최고 해금 스테이지 (로컬스토리지 연동)
   const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
     const saved = localStorage.getItem('wt_max_stage_v2');
     return saved ? parseInt(saved, 10) : 1;
@@ -33,23 +30,11 @@ export default function App() {
       .catch((err) => console.error('단어 DB 로드 실패:', err));
   }, []);
 
-  // 현재 스테이지 생성 (5행 4열, 20칸, 정확히 6단어)
+  // 결정론적 고정 스테이지 생성 (모든 유저 동일 정답/동일 배치)
   const currentStage: StageData | null = useMemo(() => {
     if (!isDbLoaded) return null;
-
-    if (stageHistory[currentGlobalStage]) {
-      return stageHistory[currentGlobalStage];
-    }
-
-    const newStage = generator.createStage(5, 4);
-
-    setStageHistory((prev) => ({
-      ...prev,
-      [currentGlobalStage]: newStage,
-    }));
-
-    return newStage;
-  }, [isDbLoaded, currentGlobalStage, gameKey, generator, stageHistory]);
+    return generator.createDeterminedStage(currentGlobalStage, 5, 4);
+  }, [isDbLoaded, currentGlobalStage, generator]);
 
   const currentChapter = Math.ceil(currentGlobalStage / STAGES_PER_CHAPTER);
   const stageInChapter = ((currentGlobalStage - 1) % STAGES_PER_CHAPTER) + 1;
@@ -79,11 +64,7 @@ export default function App() {
   };
 
   const handleResetStage = () => {
-    const newStage = generator.createStage(5, 4);
-    setStageHistory((prev) => ({
-      ...prev,
-      [currentGlobalStage]: newStage,
-    }));
+    // 다시하기 시 보드 리마운트 (이미 맞춘 단어는 로컬스토리지에서 복원됨)
     setGameKey((prev) => prev + 1);
   };
 
@@ -97,8 +78,7 @@ export default function App() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      
-      {/* 40챕터 x 20스테이지 폴백 네비게이터 모달 */}
+      {/* 40챕터 800스테이지 선택 모달 */}
       {isMenuOpen && (
         <div
           style={{
@@ -132,16 +112,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* 챕터 탭 슬라이더 (1~40) */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '6px',
-                overflowX: 'auto',
-                paddingBottom: '8px',
-                marginBottom: '12px',
-              }}
-            >
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '12px' }}>
               {Array.from({ length: TOTAL_CHAPTERS }).map((_, idx) => {
                 const chap = idx + 1;
                 const isSelected = chap === selectedChapterTab;
@@ -167,15 +138,7 @@ export default function App() {
               })}
             </div>
 
-            {/* 선택된 챕터 내 20개 스테이지 그리드 */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '8px',
-                marginBottom: '16px',
-              }}
-            >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '16px' }}>
               {Array.from({ length: STAGES_PER_CHAPTER }).map((_, idx) => {
                 const stageNumInChap = idx + 1;
                 const globalNum = (selectedChapterTab - 1) * STAGES_PER_CHAPTER + stageNumInChap;
@@ -277,12 +240,13 @@ export default function App() {
         </div>
       )}
 
-      {/* 게임 보드 */}
+      {/* 보드 */}
       <WordTowerBoard
         key={gameKey}
         stage={currentStage}
         stageNumber={stageInChapter}
         chapterNumber={currentChapter}
+        globalStageNumber={currentGlobalStage}
         onClear={handleStageClear}
         onReset={handleResetStage}
         onOpenMenu={() => {
