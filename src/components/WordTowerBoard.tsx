@@ -6,6 +6,7 @@ interface Props {
   stage: StageData;
   stageNumber: number;
   chapterNumber?: number;
+  globalStageNumber: number;
   onClear: () => void;
   onReset: () => void;
   onOpenMenu: () => void;
@@ -15,30 +16,40 @@ export const WordTowerBoard: React.FC<Props> = ({
   stage,
   stageNumber,
   chapterNumber = 1,
+  globalStageNumber,
   onClear,
   onReset,
   onOpenMenu,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
-  const [clearedWords, setClearedWords] = useState<string[]>([]);
 
-  // 단어별 힌트 공개 글자 수 맵 (단어 -> 공개된 글자 개수)
+  // 로컬스토리지 기반 이미 맞춘 단어 영속화 (새로고침해도 보존)
+  const storageKey = `wt_cleared_words_stage_${globalStageNumber}`;
+  const [clearedWords, setClearedWords] = useState<string[]>(() => {
+    const saved = localStorage.getItem(storageKey);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [revealedCountMap, setRevealedCountMap] = useState<Record<string, number>>({});
-
-  // 힌트 모달 상태
   const [isHintModalOpen, setIsHintModalOpen] = useState(false);
   const [hintPassword, setHintPassword] = useState('');
   const [hintError, setHintError] = useState(false);
-
-  // 설명서 모달 상태
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  // 친절한 오답 안내 토스트 상태
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2500);
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
-    setClearedWords([]);
-    setRevealedCountMap({});
 
     const engine = new PixiWordEngine({
       container: containerRef.current,
@@ -49,8 +60,9 @@ export const WordTowerBoard: React.FC<Props> = ({
         if (stage.targetWords.includes(word) && !clearedWords.includes(word)) {
           setClearedWords((prev) => {
             const next = [...prev, word];
+            localStorage.setItem(storageKey, JSON.stringify(next));
             if (next.length === stage.targetWords.length) {
-              setTimeout(onClear, 600);
+              setTimeout(onClear, 500);
             }
             return next;
           });
@@ -58,26 +70,25 @@ export const WordTowerBoard: React.FC<Props> = ({
         }
         return false;
       },
+      onInvalidSubmit: () => {
+        showToast('일치하는 단어가 없습니다. 천천히 다시 연결해 보세요! 😊');
+      },
     });
 
     const clonedGrid = JSON.parse(JSON.stringify(stage.grid));
-    engine.init(clonedGrid);
+    engine.init(clonedGrid, clearedWords, stage.targetWords);
     engineRef.current = engine;
 
     return () => {
       engine.destroy();
       engineRef.current = null;
     };
-  }, [stage]);
+  }, [stage, globalStageNumber]);
 
-  // 힌트 실행: 쓸 때마다 1글자씩 추가 공개
   const handleApplyHint = () => {
     if (hintPassword.trim() === '대전a반최고') {
-      // 아직 완전히 맞추지 않은 단어 목록
       const remainingWords = stage.targetWords.filter((w) => !clearedWords.includes(w));
-
       if (remainingWords.length > 0 && engineRef.current) {
-        // 아직 전체 글자가 다 열리지 않은 단어 찾기
         const targetWord = remainingWords.find(
           (w) => (revealedCountMap[w] || 0) < w.length
         ) || remainingWords[0];
@@ -85,17 +96,14 @@ export const WordTowerBoard: React.FC<Props> = ({
         const currentRevealed = revealedCountMap[targetWord] || 0;
         const nextRevealed = Math.min(targetWord.length, currentRevealed + 1);
 
-        // 상태 업데이트: 해당 단어의 노출 글자 수 1 증가
         setRevealedCountMap((prev) => ({
           ...prev,
           [targetWord]: nextRevealed,
         }));
 
-        // 방금 열린 글자를 캔버스 보드에서도 하이라이트
         const revealedChar = targetWord[nextRevealed - 1];
         engineRef.current.showHint(revealedChar);
       }
-
       setIsHintModalOpen(false);
       setHintPassword('');
       setHintError(false);
@@ -107,12 +115,32 @@ export const WordTowerBoard: React.FC<Props> = ({
   const remainingCount = stage.targetWords.length - clearedWords.length;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
       
-      {/* 1. 상단 헤더 영역 */}
+      {/* 친절한 경고 토스트 알림 */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            background: '#1e293b',
+            border: '1px solid #38bdf8',
+            color: '#f8fafc',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: 700,
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+            zIndex: 100,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
+
+      {/* 상단 헤더 영역 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
-        
-        {/* 상단 1열 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <button
@@ -138,7 +166,6 @@ export const WordTowerBoard: React.FC<Props> = ({
             </h1>
           </div>
 
-          {/* 액션 버튼 그룹 */}
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
             <button
               onClick={() => setIsHelpModalOpen(true)}
@@ -206,7 +233,6 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 상단 2열 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, whiteSpace: 'nowrap' }}>
             숨겨진 6개 단어를 드래그해 완성하세요
@@ -229,7 +255,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 2. 힌트 누적 반영 슬롯 (힌트 쓴 만큼 글자 오픈) */}
+        {/* 힌트 슬롯 (완료 단어는 파란색, 힌트는 노란색 유지) */}
         <div
           style={{
             display: 'grid',
@@ -244,8 +270,6 @@ export const WordTowerBoard: React.FC<Props> = ({
           {stage.targetWords.map((word, idx) => {
             const isCleared = clearedWords.includes(word);
             const revealedCount = revealedCountMap[word] || 0;
-
-            // 힌트로 열린 글자 + 남은 블라인드 점(●) 조합
             const visiblePart = word.slice(0, revealedCount);
             const hiddenPart = '●'.repeat(Math.max(0, word.length - revealedCount));
 
@@ -277,13 +301,11 @@ export const WordTowerBoard: React.FC<Props> = ({
                   </span>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                    {/* 힌트로 열린 앞 글자들 (황금색 표시) */}
                     {visiblePart && (
                       <span style={{ fontSize: '12px', fontWeight: 800, color: '#facc15', letterSpacing: '0.5px' }}>
                         {visiblePart}
                       </span>
                     )}
-                    {/* 아직 안 열린 글자들 */}
                     {hiddenPart && (
                       <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', letterSpacing: '1.5px', marginLeft: visiblePart ? '2px' : '0' }}>
                         {hiddenPart}
@@ -295,10 +317,9 @@ export const WordTowerBoard: React.FC<Props> = ({
             );
           })}
         </div>
-
       </div>
 
-      {/* 3. 캔버스 영역 */}
+      {/* 캔버스 영역 */}
       <div
         ref={containerRef}
         style={{
@@ -312,7 +333,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
-      {/* 설명서 모달 */}
+      {/* 개편된 게임 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
@@ -347,23 +368,23 @@ export const WordTowerBoard: React.FC<Props> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#cbd5e1', lineHeight: '1.5' }}>
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #38bdf8' }}>
-                <strong style={{ color: '#f8fafc' }}>1. 단어 연결 규칙</strong>
+                <strong style={{ color: '#f8fafc' }}>1. 공통 고정 스테이지</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  손가락이나 마우스로 <strong>상하좌우·대각선(8방향)</strong> 인접한 글자들을 이어서 숨겨진 단어를 드래그하세요.
-                </p>
-              </div>
-
-              <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #f59e0b' }}>
-                <strong style={{ color: '#f8fafc' }}>2. 타워 중력 법칙 (핵심!)</strong>
-                <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  단어가 맞춰지면 타일이 사라지고 위의 글자들이 아래로 떨어집니다. <strong>순서를 잘못 맞추면 글자가 끊겨 클리어가 불가능</strong>해질 수 있습니다.
+                  모든 플레이어는 스테이지 번호마다 <strong>동일한 6개의 단어와 동일한 격자 배치</strong>를 공유합니다.
                 </p>
               </div>
 
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #10b981' }}>
-                <strong style={{ color: '#f8fafc' }}>3. 막혔을 때의 팁</strong>
+                <strong style={{ color: '#f8fafc' }}>2. 중력 없는 편안한 플레이</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  순서가 꼬였다면 <strong>↺ (다시하기)</strong> 버튼으로 초기 배치로 되돌리세요. 글자가 안 보일 땐 <strong>💡 (힌트)</strong>를 누를 때마다 단어의 글자가 하나씩 열립니다.
+                  타일이 아래로 떨어지지 않으므로 순서 부담 없이 자유롭게 맞추세요. <strong>잘못 연결하면 안내문과 함께 다시 시도</strong>할 수 있습니다.
+                </p>
+              </div>
+
+              <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #f59e0b' }}>
+                <strong style={{ color: '#f8fafc' }}>3. 진행도 자동 보존</strong>
+                <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
+                  다시하기(↺)를 누르거나 새로고침을 하더라도 <strong>이미 맞춘 단어는 유지</strong>되며, 남은 단어만 이어서 풀 수 있습니다.
                 </p>
               </div>
             </div>
