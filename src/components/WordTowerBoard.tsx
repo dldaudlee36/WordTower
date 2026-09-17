@@ -24,8 +24,8 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  // 로컬스토리지 기반 이미 맞춘 단어 영속화 (새로고침해도 보존)
-  const storageKey = `wt_cleared_words_stage_${globalStageNumber}`;
+  // 깨진 이전 캐시와 분리하기 위한 버전형 스토리지 키
+  const storageKey = `wt_cleared_words_v3_stage_${globalStageNumber}`;
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
@@ -37,7 +37,6 @@ export const WordTowerBoard: React.FC<Props> = ({
   const [hintError, setHintError] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
-  // 브라우저 표준 타이머 타입 적용 (TS2503 완전 해결)
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,7 +46,6 @@ export const WordTowerBoard: React.FC<Props> = ({
     toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2500);
   };
 
-  // 스테이지 번호 변경 시 맞춘 단어 목록 동기화
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     setClearedWords(saved ? JSON.parse(saved) : []);
@@ -62,7 +60,7 @@ export const WordTowerBoard: React.FC<Props> = ({
       container: containerRef.current,
       rows: stage.rows,
       cols: stage.cols,
-      onWordSubmit: (selectedChars) => {
+      onWordSubmit: (selectedChars, _tileIds) => {
         const word = selectedChars.join('');
         if (stage.targetWords.includes(word) && !clearedWords.includes(word)) {
           setClearedWords((prev) => {
@@ -73,7 +71,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             }
             return next;
           });
-          return true;
+          return true; // 오직 이 단어의 타일들만 PixiWordEngine에서 음영 처리됨
         }
         return false;
       },
@@ -124,7 +122,6 @@ export const WordTowerBoard: React.FC<Props> = ({
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative' }}>
       
-      {/* 친절한 경고 토스트 알림 */}
       {toastMessage && (
         <div
           style={{
@@ -262,7 +259,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 힌트 슬롯 (완료 단어는 파란색, 힌트는 노란색 유지) */}
+        {/* 6개 단어 슬롯: 4글자 2개, 3글자 4개만 정확히 노출 */}
         <div
           style={{
             display: 'grid',
@@ -340,7 +337,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
-      {/* 개편된 게임 설명서 모달 */}
+      {/* 게임 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
@@ -384,14 +381,14 @@ export const WordTowerBoard: React.FC<Props> = ({
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #10b981' }}>
                 <strong style={{ color: '#f8fafc' }}>2. 중력 없는 편안한 플레이</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  타일이 아래로 떨어지지 않으므로 순서 부담 없이 자유롭게 맞추세요. <strong>잘못 연결하면 안내문과 함께 다시 시도</strong>할 수 있습니다.
+                  타일이 떨어지지 않으므로 원하는 단어부터 자유롭게 맞추세요. <strong>잘못 연결하면 친절한 안내와 함께 재시도</strong>할 수 있습니다.
                 </p>
               </div>
 
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #f59e0b' }}>
                 <strong style={{ color: '#f8fafc' }}>3. 진행도 자동 보존</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  다시하기(↺)를 누르거나 새로고침을 하더라도 <strong>이미 맞춘 단어는 유지</strong>되며, 남은 단어만 이어서 풀 수 있습니다.
+                  새로고침을 하더라도 <strong>이미 맞춘 단어는 유지</strong>되며, 남은 단어만 이어서 풀 수 있습니다.
                 </p>
               </div>
             </div>
