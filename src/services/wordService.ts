@@ -11,6 +11,20 @@ export function createSeededRandom(seed: number) {
   };
 }
 
+// 합이 정확히 20이 되는 패턴 목록
+const PATTERNS: number[][] = [
+  [4, 4, 3, 3, 3, 3],       // 6단어 (합 20)
+  [5, 4, 3, 3, 3, 2],       // 6단어 (합 20)
+  [5, 5, 4, 3, 3],          // 5단어 (합 20)
+  [4, 4, 4, 3, 3, 2],       // 6단어 (합 20)
+  [5, 3, 3, 3, 2, 2, 2],    // 7단어 (합 20)
+  [4, 4, 3, 3, 2, 2, 2],    // 7단어 (합 20)
+  [5, 5, 3, 3, 2, 2],       // 6단어 (합 20)
+  [3, 3, 3, 3, 2, 2, 2, 2], // 8단어 (합 20)
+  [5, 4, 4, 3, 2, 2],       // 6단어 (합 20)
+  [5, 5, 2, 2, 2, 2, 2],    // 7단어 (합 20)
+];
+
 class WordService {
   private db: WordDatabase | null = null;
 
@@ -29,38 +43,51 @@ class WordService {
 
     const prng = createSeededRandom(stageNumber * 997 + 13);
 
-    const raw4 = this.db['4'] || this.db[4] || [];
-    const raw3 = this.db['3'] || this.db[3] || [];
+    // 패턴 선택
+    const patternIndex = Math.floor(prng() * PATTERNS.length);
+    const pattern = PATTERNS[patternIndex];
 
-    const words4 = raw4
-      .map((w) => w.trim())
-      .filter((w) => w.length === 4 && /^[가-힣]+$/.test(w))
-      .sort();
+    // 스테이지별 독립 풀 복사 (깊은 복사)
+    const availablePools: Record<number, string[]> = {
+      2: [...(this.db['2'] || [])],
+      3: [...(this.db['3'] || [])],
+      4: [...(this.db['4'] || [])],
+      5: [...(this.db['5'] || [])],
+    };
 
-    const words3 = raw3
-      .map((w) => w.trim())
-      .filter((w) => w.length === 3 && /^[가-힣]+$/.test(w))
-      .sort();
+    const chosenWords: string[] = [];
+    const usedWordSet = new Set<string>();
 
-    if (words4.length < 2 || words3.length < 4) {
-      throw new Error(`단어 풀 부족 (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
+    for (const len of pattern) {
+      const pool = availablePools[len];
+      if (!pool || pool.length === 0) {
+        throw new Error(`${len}음절 단어 풀이 고갈되었습니다.`);
+      }
+
+      let selectedWord: string | null = null;
+      let attempts = 0;
+
+      // 중복되지 않은 단어가 나올 때까지 비복원 추출
+      while (pool.length > 0 && attempts < 100) {
+        attempts++;
+        const pickIdx = Math.floor(prng() * pool.length);
+        const candidate = pool.splice(pickIdx, 1)[0]; // 뽑은 즉시 풀에서 제거
+
+        if (!usedWordSet.has(candidate)) {
+          selectedWord = candidate;
+          usedWordSet.add(candidate);
+          break;
+        }
+      }
+
+      if (!selectedWord) {
+        throw new Error(`스테이지 ${stageNumber}: 중복 없는 ${len}음절 단어 추출 실패`);
+      }
+
+      chosenWords.push(selectedWord);
     }
 
-    const chosen: string[] = [];
-
-    const pool4 = [...words4];
-    for (let i = 0; i < 2; i++) {
-      const idx = Math.floor(prng() * pool4.length);
-      chosen.push(pool4.splice(idx, 1)[0]);
-    }
-
-    const pool3 = [...words3];
-    for (let i = 0; i < 4; i++) {
-      const idx = Math.floor(prng() * pool3.length);
-      chosen.push(pool3.splice(idx, 1)[0]);
-    }
-
-    return chosen;
+    return chosenWords;
   }
 }
 
