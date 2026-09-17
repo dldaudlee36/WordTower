@@ -44,7 +44,7 @@ export class PixiWordEngine {
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
-    // 기존에 이미 맞춘 단어들의 타일 ID 식별
+    // 초기 로딩 시 이미 맞춰둔 단어의 타일만 정확히 비활성화 Set에 등록
     initialClearedWords.forEach((word) => {
       const wId = targetWords.indexOf(word);
       if (wId !== -1) {
@@ -84,9 +84,16 @@ export class PixiWordEngine {
   }
 
   private renderTiles() {
-    const textStyle = new TextStyle({
+    const activeTextStyle = new TextStyle({
       fontSize: 26,
       fill: '#f8fafc',
+      fontWeight: 'bold',
+      fontFamily: 'sans-serif',
+    });
+
+    const clearedTextStyle = new TextStyle({
+      fontSize: 26,
+      fill: '#475569',
       fontWeight: 'bold',
       fontFamily: 'sans-serif',
     });
@@ -101,17 +108,15 @@ export class PixiWordEngine {
         const y = r * (this.tileSize + this.tileGap);
         tileContainer.position.set(x, y);
 
-        const isAlreadyCleared = this.clearedTileIds.has(tile.id);
+        const isCleared = this.clearedTileIds.has(tile.id);
 
         const bg = new Graphics();
         bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-        bg.fill(isAlreadyCleared ? 0x1e293b : 0x334155);
+        bg.fill(isCleared ? 0x1e293b : 0x334155);
 
         const txt = new Text({
           text: tile.char,
-          style: isAlreadyCleared
-            ? new TextStyle({ fontSize: 26, fill: '#475569', fontWeight: 'bold' })
-            : textStyle,
+          style: isCleared ? clearedTextStyle : activeTextStyle,
         });
         txt.anchor.set(0.5);
         txt.position.set(this.tileSize / 2, this.tileSize / 2);
@@ -155,6 +160,7 @@ export class PixiWordEngine {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
+        // 이미 맞춘 타일은 선택 불가
         if (!tile || this.clearedTileIds.has(tile.id)) continue;
 
         const tx = c * (this.tileSize + this.tileGap);
@@ -225,6 +231,7 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
+      // [핵심] 오직 방금 맞춘 타일들만 Set에 추가하고 음영 처리
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
