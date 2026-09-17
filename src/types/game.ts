@@ -1,9 +1,9 @@
 export interface TileData {
   id: string;
   char: string;
-  word: string;     // 해당 타일이 속한 정확한 단어 문자열
-  wordIndex: number;// 0 ~ 5
-  charIndex: number;// 단어 내 글자 순서 (0, 1, 2...)
+  word: string;
+  wordIndex: number;
+  charIndex: number;
   row: number;
   col: number;
 }
