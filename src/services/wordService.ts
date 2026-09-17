@@ -25,14 +25,13 @@ class WordService {
   }
 
   public getStageWordsForSeed(stageNumber: number): string[] {
-    if (!this.db) throw new Error('단어 DB가 초기화되지 않았습니다.');
+    if (!this.db) throw new Error('단어 DB가 로드되지 않았습니다.');
 
     const prng = createSeededRandom(stageNumber * 997 + 13);
 
     const raw4 = this.db['4'] || this.db[4] || [];
     const raw3 = this.db['3'] || this.db[3] || [];
 
-    // 공백 없는 정확한 4음절, 3음절 순수 한글 어휘 필터링
     const words4 = raw4
       .map((w) => w.trim())
       .filter((w) => w.length === 4 && /^[가-힣]+$/.test(w))
@@ -49,21 +48,19 @@ class WordService {
 
     const chosen: string[] = [];
 
-    // 4음절 2개 추출 (8칸)
     const pool4 = [...words4];
     for (let i = 0; i < 2; i++) {
       const idx = Math.floor(prng() * pool4.length);
       chosen.push(pool4.splice(idx, 1)[0]);
     }
 
-    // 3음절 4개 추출 (12칸)
     const pool3 = [...words3];
     for (let i = 0; i < 4; i++) {
       const idx = Math.floor(prng() * pool3.length);
       chosen.push(pool3.splice(idx, 1)[0]);
     }
 
-    return chosen; // 총 6단어, 정확히 20자
+    return chosen;
   }
 }
 
