@@ -72,11 +72,11 @@ export const WordTowerBoard: React.FC<Props> = ({
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
 
-    const engine = new PixiWordEngine({
+const engine = new PixiWordEngine({
       container: containerRef.current,
       rows: stage.rows,
       cols: stage.cols,
-      onWordSubmit: (selectedChars) => {
+      onWordSubmit: (selectedChars, _tileIds) => {
         const word = selectedChars.join('');
         const currentCleared = clearedWordsRef.current;
 
