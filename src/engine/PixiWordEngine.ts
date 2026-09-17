@@ -6,7 +6,7 @@ interface EngineConfig {
   container: HTMLElement;
   rows: number;
   cols: number;
-  onWordSubmit: (selectedChars: string[]) => boolean; // 단일 인자로 통일
+  onWordSubmit: (selectedChars: string[]) => boolean;
   onInvalidSubmit: () => void;
 }
 
@@ -40,10 +40,12 @@ export class PixiWordEngine {
 
   private selectedTiles: TileData[] = [];
   private isPointerDown: boolean = false;
-  private onWordSubmit: (selectedChars: string[], tileIds: string[]) => boolean;
+  private onWordSubmit: (selectedChars: string[]) => boolean;
   private onInvalidSubmit: () => void;
   private currentGrid: GridData = [];
   private clearedTileIds: Set<string> = new Set();
+
+  private isDestroyed: boolean = false;
 
   constructor(config: EngineConfig) {
     this.container = config.container;
@@ -57,6 +59,7 @@ export class PixiWordEngine {
   }
 
   public async init(initialGrid: GridData, initialClearedWords: string[]) {
+    this.isDestroyed = false;
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
@@ -79,7 +82,17 @@ export class PixiWordEngine {
       autoDensity: true,
     });
 
-    this.container.appendChild(this.app.canvas);
+    if (this.isDestroyed) {
+      try {
+        this.app.destroy(true, { children: true });
+      } catch (_) {}
+      return;
+    }
+
+    if (this.container) {
+      this.container.appendChild(this.app.canvas);
+    }
+
     this.app.stage.addChild(this.boardContainer);
     this.boardContainer.addChild(this.lineGraphics);
 
@@ -245,7 +258,7 @@ export class PixiWordEngine {
 
     const chars = this.selectedTiles.map((t) => t.char);
     const ids = this.selectedTiles.map((t) => t.id);
-    const isSuccess = this.onWordSubmit(chars); // chars만 전달
+    const isSuccess = this.onWordSubmit(chars);
 
     if (isSuccess) {
       ids.forEach((id) => {
@@ -318,6 +331,7 @@ export class PixiWordEngine {
   }
 
   public destroy() {
+    this.isDestroyed = true;
     try {
       if (this.app && this.app.renderer) {
         this.app.destroy(true, { children: true });
