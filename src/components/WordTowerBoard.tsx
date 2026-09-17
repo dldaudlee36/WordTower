@@ -25,7 +25,7 @@ export const WordTowerBoard: React.FC<Props> = ({
   const engineRef = useRef<PixiWordEngine | null>(null);
 
   // 깨진 이전 캐시와 분리하기 위한 버전형 스토리지 키
-  const storageKey = `wt_cleared_words_v3_stage_${globalStageNumber}`;
+  const storageKey = `wt_cleared_words_v4_stage_${globalStageNumber}`;
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
