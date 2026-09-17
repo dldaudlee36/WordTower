@@ -40,20 +40,18 @@ export class PixiWordEngine {
     this.lineGraphics = new Graphics();
   }
 
-  public async init(initialGrid: GridData, initialClearedWords: string[], targetWords: string[]) {
+  public async init(initialGrid: GridData, initialClearedWords: string[], _targetWords: string[]) {
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
-    // 초기 로딩 시 이미 맞춰둔 단어의 타일만 정확히 비활성화 Set에 등록
+    // 초기 로딩 시: 이미 클리어된 단어가 있다면 해당 단어에 속한 타일 ID만 개별 식별
     initialClearedWords.forEach((word) => {
-      const wId = targetWords.indexOf(word);
-      if (wId !== -1) {
-        for (let r = 0; r < this.rows; r++) {
-          for (let c = 0; c < this.cols; c++) {
-            const t = this.currentGrid[r][c];
-            if (t && t.wordId === wId) {
-              this.clearedTileIds.add(t.id);
-            }
+      // wordId 대신 타일의 고유 ID 접미사를 기준으로 안전하게 매핑
+      for (let r = 0; r < this.rows; r++) {
+        for (let c = 0; c < this.cols; c++) {
+          const t = this.currentGrid[r][c];
+          if (t && t.id.includes(`_${word}_`)) {
+            this.clearedTileIds.add(t.id);
           }
         }
       }
@@ -84,16 +82,18 @@ export class PixiWordEngine {
   }
 
   private renderTiles() {
+    // 1. 활성 타일 스타일: 선명한 화이트 텍스트
     const activeTextStyle = new TextStyle({
       fontSize: 26,
-      fill: '#f8fafc',
-      fontWeight: 'bold',
+      fill: '#ffffff',
+      fontWeight: '900',
       fontFamily: 'sans-serif',
     });
 
+    // 2. 클리어 타일 스타일: 어두운 회색 텍스트
     const clearedTextStyle = new TextStyle({
       fontSize: 26,
-      fill: '#475569',
+      fill: '#334155',
       fontWeight: 'bold',
       fontFamily: 'sans-serif',
     });
@@ -111,8 +111,10 @@ export class PixiWordEngine {
         const isCleared = this.clearedTileIds.has(tile.id);
 
         const bg = new Graphics();
-        bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-        bg.fill(isCleared ? 0x1e293b : 0x334155);
+        bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
+        // 안 맞춘 단어는 명확한 네이비 블루(#1e293b / #334155), 맞춘 타일은 꺼진 검정(#0b0f19)
+        bg.fill(isCleared ? 0x0b0f19 : 0x1e293b);
+        bg.stroke({ width: 1.5, color: isCleared ? 0x1e293b : 0x475569 });
 
         const txt = new Text({
           text: tile.char,
@@ -160,7 +162,6 @@ export class PixiWordEngine {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
-        // 이미 맞춘 타일은 선택 불가
         if (!tile || this.clearedTileIds.has(tile.id)) continue;
 
         const tx = c * (this.tileSize + this.tileGap);
@@ -198,19 +199,26 @@ export class PixiWordEngine {
     this.redrawLines();
   }
 
+  // 드래그 중인 타일 하이라이트 (파란색)
   private highlightTile(tile: TileData, isSelected: boolean) {
     const sprite = this.tileSprites.get(tile.id);
     if (!sprite) return;
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-    sprite.bg.fill(isSelected ? 0x2563eb : 0x334155);
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
+    if (isSelected) {
+      sprite.bg.fill(0x2563eb);
+      sprite.bg.stroke({ width: 2, color: 0x60a5fa });
+    } else {
+      sprite.bg.fill(0x1e293b);
+      sprite.bg.stroke({ width: 1.5, color: 0x475569 });
+    }
   }
 
   private redrawLines() {
     this.lineGraphics.clear();
     if (this.selectedTiles.length < 2) return;
 
-    this.lineGraphics.setStrokeStyle({ width: 5, color: 0x60a5fa, alpha: 0.85 });
+    this.lineGraphics.setStrokeStyle({ width: 5, color: 0x60a5fa, alpha: 0.9 });
     this.selectedTiles.forEach((tile, index) => {
       const x = tile.col * (this.tileSize + this.tileGap) + this.tileSize / 2;
       const y = tile.row * (this.tileSize + this.tileGap) + this.tileSize / 2;
@@ -231,19 +239,21 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      // [핵심] 오직 방금 맞춘 타일들만 Set에 추가하고 음영 처리
+      // [핵심] 오직 방금 맞춘 타일들만 정확히 비활성화 음영 처리
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
         if (sprite) {
           sprite.bg.clear();
-          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-          sprite.bg.fill(0x1e293b);
-          sprite.text.style.fill = '#475569';
-          gsap.fromTo(sprite.container.scale, { x: 1.1, y: 1.1 }, { x: 1, y: 1, duration: 0.2 });
+          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
+          sprite.bg.fill(0x0b0f19);
+          sprite.bg.stroke({ width: 1, color: 0x1e293b });
+          sprite.text.style.fill = '#334155';
+          gsap.fromTo(sprite.container.scale, { x: 1.08, y: 1.08 }, { x: 1, y: 1, duration: 0.2 });
         }
       });
     } else {
+      // 실패 시: 선택되었던 타일들을 원래의 선명한 상태로 복구
       this.selectedTiles.forEach((t) => {
         const sprite = this.tileSprites.get(t.id);
         if (sprite) {
@@ -276,8 +286,9 @@ export class PixiWordEngine {
     if (!sprite) return false;
 
     sprite.bg.clear();
-    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
+    sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 12);
     sprite.bg.fill(0xeab308);
+    sprite.bg.stroke({ width: 2, color: 0xfde047 });
 
     gsap.fromTo(
       sprite.container.scale,
