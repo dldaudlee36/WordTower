@@ -5,24 +5,30 @@ import { wordService } from './services/wordService';
 import type { StageData } from './types/game';
 
 export default function App() {
+  // [1] 모든 State 및 Hook은 반드시 컴포넌트 최상단에 일괄 선언
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [stageHistory, setStageHistory] = useState<StageData[]>([]);
-  const [maxUnlockedStage, setMaxUnlockedStage] = useState(1);
   const [isStageCleared, setIsStageCleared] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // 로컬스토리지 연동 최고 해금 스테이지 (단 1번만 최상단에 선언)
+  const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
+    const saved = localStorage.getItem('wt_max_stage');
+    return saved ? parseInt(saved, 10) : 1;
+  });
+
   const generator = useMemo(() => new LevelGenerator(), []);
 
-  // 1. 단어 DB 파일(public/data/words.json) 비동기 로드
+  // [2] Effect 훅
   useEffect(() => {
     wordService.loadDatabase()
       .then(() => setIsDbLoaded(true))
       .catch((err) => console.error('단어 DB 로드 실패:', err));
   }, []);
 
-  // 2. 스테이지 반환
+  // [3] Memo 훅: 현재 스테이지 연산
   const currentStage: StageData | null = useMemo(() => {
     if (!isDbLoaded) return null;
 
@@ -45,29 +51,21 @@ export default function App() {
     return newStage;
   }, [isDbLoaded, currentStageIdx, gameKey, generator, stageHistory]);
 
-  if (!isDbLoaded || !currentStage) {
-    return (
-      <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#60a5fa', fontSize: '16px', fontWeight: 800 }}>단어 DB 불러오는 중...</div>
-      </main>
-    );
-  }
+  // [4] 핸들러 함수들
+  const handleStageClear = () => {
+    setIsStageCleared(true);
+    const nextStage = currentStageIdx + 2;
+    if (nextStage > maxUnlockedStage) {
+      setMaxUnlockedStage(nextStage);
+      localStorage.setItem('wt_max_stage', nextStage.toString());
+    }
+  };
 
-  // 기존 useState 선언부를 로컬스토리지 연동으로 교체
-const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
-  const saved = localStorage.getItem('wt_max_stage');
-  return saved ? parseInt(saved, 10) : 1;
-});
-
-// 스테이지 클리어 핸들러 보강
-const handleStageClear = () => {
-  setIsStageCleared(true);
-  const nextStage = currentStageIdx + 2;
-  if (nextStage > maxUnlockedStage) {
-    setMaxUnlockedStage(nextStage);
-    localStorage.setItem('wt_max_stage', nextStage.toString());
-  }
-};
+  const handleNextStage = () => {
+    setCurrentStageIdx((prev) => prev + 1);
+    setIsStageCleared(false);
+    setGameKey((prev) => prev + 1);
+  };
 
   const handleSelectStage = (index: number) => {
     setCurrentStageIdx(index);
@@ -89,6 +87,16 @@ const handleStageClear = () => {
     setGameKey((prev) => prev + 1);
   };
 
+  // [5] 훅 선언이 모두 끝난 후 조기 반환(Early Return) 처리
+  if (!isDbLoaded || !currentStage) {
+    return (
+      <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#60a5fa', fontSize: '16px', fontWeight: 800 }}>단어 DB 불러오는 중...</div>
+      </main>
+    );
+  }
+
+  // [6] 메인 렌더링
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {/* 폴백 메뉴 모달 */}
@@ -225,7 +233,7 @@ const handleStageClear = () => {
         </div>
       )}
 
-      {/* 보드 */}
+      {/* 게임 보드 마운트 */}
       <WordTowerBoard
         key={gameKey}
         stage={currentStage}
