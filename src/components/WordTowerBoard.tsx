@@ -76,7 +76,7 @@ const engine = new PixiWordEngine({
       container: containerRef.current,
       rows: stage.rows,
       cols: stage.cols,
-      onWordSubmit: (selectedChars, _tileIds) => {
+      onWordSubmit: (selectedChars) => {
         const word = selectedChars.join('');
         const currentCleared = clearedWordsRef.current;
 
