@@ -71,7 +71,8 @@ export class PixiWordEngine {
     }
 
     await this.app.init({
-      resizeTo: this.container,
+      width: 360,
+      height: 430,
       backgroundColor: 0x070b14,
       antialias: true,
       resolution: window.devicePixelRatio || 2,
