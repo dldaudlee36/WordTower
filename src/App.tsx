@@ -4,9 +4,10 @@ import { LevelGenerator } from './engine/LevelGenerator';
 import { wordService } from './services/wordService';
 import type { StageData } from './types/game';
 
-const TOTAL_CHAPTERS = 40;
+// [확장] 신규 단어 풀에 맞추어 50챕터 1,000 스테이지로 스케일업
+const TOTAL_CHAPTERS = 50;
 const STAGES_PER_CHAPTER = 20;
-const TOTAL_STAGES = TOTAL_CHAPTERS * STAGES_PER_CHAPTER;
+const TOTAL_STAGES = TOTAL_CHAPTERS * STAGES_PER_CHAPTER; // 1,000
 
 export default function App() {
   const [isDbLoaded, setIsDbLoaded] = useState(false);
@@ -18,7 +19,7 @@ export default function App() {
   const [selectedChapterTab, setSelectedChapterTab] = useState(1);
 
   const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
-    const saved = localStorage.getItem('wt_max_stage_v2');
+    const saved = localStorage.getItem('wt_max_stage_v3');
     return saved ? parseInt(saved, 10) : 1;
   });
 
@@ -30,7 +31,6 @@ export default function App() {
       .catch((err) => console.error('단어 DB 로드 실패:', err));
   }, []);
 
-  // 결정론적 고정 스테이지 생성 (gameKey 의존성 추가로 다시하기 완벽 지원)
   const currentStage: StageData | null = useMemo(() => {
     if (!isDbLoaded) return null;
     return generator.createDeterminedStage(currentGlobalStage, 5, 4);
@@ -44,7 +44,7 @@ export default function App() {
     const nextStage = currentGlobalStage + 1;
     if (nextStage > maxUnlockedStage && nextStage <= TOTAL_STAGES) {
       setMaxUnlockedStage(nextStage);
-      localStorage.setItem('wt_max_stage_v2', nextStage.toString());
+      localStorage.setItem('wt_max_stage_v3', nextStage.toString());
     }
   };
 
@@ -70,14 +70,14 @@ export default function App() {
   if (!isDbLoaded || !currentStage) {
     return (
       <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#60a5fa', fontSize: '16px', fontWeight: 800 }}>단어 DB 불러오는 중...</div>
+        <div style={{ color: '#60a5fa', fontSize: '16px', fontWeight: 800 }}>단어 타워 로딩 중...</div>
       </main>
     );
   }
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {/* 40챕터 800스테이지 선택 모달 */}
+      {/* 50챕터 1,000스테이지 선택 모달 */}
       {isMenuOpen && (
         <div
           style={{
@@ -107,7 +107,7 @@ export default function App() {
                 챕터 & 스테이지 선택
               </h3>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                해금: {maxUnlockedStage} / 800
+                해금: {maxUnlockedStage} / 1000
               </span>
             </div>
 
@@ -239,7 +239,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 보드 */}
+      {/* 보드 컴포넌트 */}
       <WordTowerBoard
         key={gameKey}
         stage={currentStage}

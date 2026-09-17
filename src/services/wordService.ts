@@ -32,7 +32,7 @@ class WordService {
     const raw4 = this.db['4'] || this.db[4] || [];
     const raw3 = this.db['3'] || this.db[3] || [];
 
-    // 완벽한 4음절, 3음절 순수 한글 필터링
+    // 공백 없는 정확한 4음절, 3음절 순수 한글 어휘 필터링
     const words4 = raw4
       .map((w) => w.trim())
       .filter((w) => w.length === 4 && /^[가-힣]+$/.test(w))
@@ -44,26 +44,26 @@ class WordService {
       .sort();
 
     if (words4.length < 2 || words3.length < 4) {
-      throw new Error(`단어 풀 부족 (4음절: ${words4.length}, 3음절: ${words3.length})`);
+      throw new Error(`단어 풀 부족 (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
     }
 
     const chosen: string[] = [];
 
-    // 4음절 2개
+    // 4음절 2개 추출 (8칸)
     const pool4 = [...words4];
     for (let i = 0; i < 2; i++) {
       const idx = Math.floor(prng() * pool4.length);
       chosen.push(pool4.splice(idx, 1)[0]);
     }
 
-    // 3음절 4개
+    // 3음절 4개 추출 (12칸)
     const pool3 = [...words3];
     for (let i = 0; i < 4; i++) {
       const idx = Math.floor(prng() * pool3.length);
       chosen.push(pool3.splice(idx, 1)[0]);
     }
 
-    return chosen;
+    return chosen; // 총 6단어, 정확히 20자
   }
 }
 

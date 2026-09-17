@@ -5,6 +5,7 @@ export class LevelGenerator {
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
     const words = wordService.getStageWordsForSeed(stageNumber);
 
+    // 50회의 결정론적 탐색 시도로 퍼즐 생성
     for (let attempt = 0; attempt < 50; attempt++) {
       const prng = createSeededRandom(stageNumber * 1009 + 37 + attempt * 23);
       const grid = this.tryGenerate(rows, cols, words, prng);
@@ -18,6 +19,7 @@ export class LevelGenerator {
       }
     }
 
+    // 최악의 경우에도 100% 풀이 가능한 뱀형 지그재그 격자 보장
     const fallbackGrid = this.guaranteedSnakeGenerate(rows, cols, words);
     return {
       rows,

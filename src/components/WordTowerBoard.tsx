@@ -24,7 +24,7 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  const storageKey = `wt_cleared_words_v7_stage_${globalStageNumber}`;
+  const storageKey = `wt_cleared_words_v8_stage_${globalStageNumber}`;
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
@@ -59,7 +59,7 @@ export const WordTowerBoard: React.FC<Props> = ({
       container: containerRef.current,
       rows: stage.rows,
       cols: stage.cols,
-      onWordSubmit: (selectedChars, _tileIds) => {
+      onWordSubmit: (selectedChars) => {
         const word = selectedChars.join('');
         if (stage.targetWords.includes(word) && !clearedWords.includes(word)) {
           setClearedWords((prev) => {
@@ -141,6 +141,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
+      {/* 상단 헤더 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -256,6 +257,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* 힌트 슬롯 (4글자 2개, 3글자 4개 = 총 20칸 규격) */}
         <div
           style={{
             display: 'grid',
@@ -366,9 +368,9 @@ export const WordTowerBoard: React.FC<Props> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#cbd5e1', lineHeight: '1.5' }}>
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #38bdf8' }}>
-                <strong style={{ color: '#f8fafc' }}>1. 공통 고정 스테이지</strong>
+                <strong style={{ color: '#f8fafc' }}>1. 50챕터 1,000 스테이지 고정</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  모든 플레이어는 스테이지 번호마다 <strong>동일한 6개의 단어와 동일한 격자 배치</strong>를 공유합니다.
+                  모든 플레이어는 각 스테이지마다 <strong>동일한 6개의 단어와 동일한 격자 배치</strong>를 공유합니다.
                 </p>
               </div>
 
