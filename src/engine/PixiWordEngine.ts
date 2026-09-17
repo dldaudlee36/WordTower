@@ -31,13 +31,12 @@ export class PixiWordEngine {
   private rows: number;
   private cols: number;
 
-  // 폰트 크기는 28px 유지, 타일 크기는 줄이고 간격은 2배로 확장
   private tileSize: number = 58;
   private tileGap: number = 16;
 
   private boardContainer: Container;
   private lineGraphics: Graphics;
-  private tileSprites: Map<string, { container: Container; text: Text; bg: Graphics }> = new Map();
+  private tileSprites: Map<string, { container: Container; text: Text; bg: Graphics; baseX: number }> = new Map();
 
   private selectedTiles: TileData[] = [];
   private isPointerDown: boolean = false;
@@ -129,7 +128,7 @@ export class PixiWordEngine {
         tileContainer.addChild(bg, txt);
         this.boardContainer.addChild(tileContainer);
 
-        this.tileSprites.set(tile.id, { container: tileContainer, text: txt, bg });
+        this.tileSprites.set(tile.id, { container: tileContainer, text: txt, bg, baseX: x });
       }
     }
   }
@@ -161,8 +160,6 @@ export class PixiWordEngine {
   private handlePointerMove(screenX: number, screenY: number) {
     const localX = screenX - this.boardContainer.x;
     const localY = screenY - this.boardContainer.y;
-
-    // 타일 경계면 오인식 방지를 위한 4px 히트박스 패딩 마진
     const hitPadding = 4;
 
     for (let r = 0; r < this.rows; r++) {
@@ -266,7 +263,14 @@ export class PixiWordEngine {
       this.selectedTiles.forEach((t) => {
         const sprite = this.tileSprites.get(t.id);
         if (sprite) {
-          gsap.to(sprite.container, { x: '+=4', yoyo: true, repeat: 3, duration: 0.05 });
+          gsap.killTweensOf(sprite.container);
+          gsap.timeline()
+            .to(sprite.container, { x: sprite.baseX + 5, duration: 0.04 })
+            .to(sprite.container, { x: sprite.baseX - 5, duration: 0.04 })
+            .to(sprite.container, { x: sprite.baseX + 4, duration: 0.04 })
+            .to(sprite.container, { x: sprite.baseX, duration: 0.04, onComplete: () => {
+              sprite.container.x = sprite.baseX;
+            }});
           this.highlightTile(t, false);
         }
       });
