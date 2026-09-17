@@ -23,20 +23,22 @@ export const WordTowerBoard: React.FC<Props> = ({
   const engineRef = useRef<PixiWordEngine | null>(null);
   const [clearedWords, setClearedWords] = useState<string[]>([]);
 
+  // 단어별 힌트 공개 글자 수 맵 (단어 -> 공개된 글자 개수)
+  const [revealedCountMap, setRevealedCountMap] = useState<Record<string, number>>({});
+
   // 힌트 모달 상태
   const [isHintModalOpen, setIsHintModalOpen] = useState(false);
   const [hintPassword, setHintPassword] = useState('');
-  const [hintIndex, setHintIndex] = useState(0);
   const [hintError, setHintError] = useState(false);
 
-  // 게임 설명서 모달 상태
+  // 설명서 모달 상태
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
     setClearedWords([]);
-    setHintIndex(0);
+    setRevealedCountMap({});
 
     const engine = new PixiWordEngine({
       container: containerRef.current,
@@ -68,15 +70,32 @@ export const WordTowerBoard: React.FC<Props> = ({
     };
   }, [stage]);
 
+  // 힌트 실행: 쓸 때마다 1글자씩 추가 공개
   const handleApplyHint = () => {
     if (hintPassword.trim() === '대전a반최고') {
+      // 아직 완전히 맞추지 않은 단어 목록
       const remainingWords = stage.targetWords.filter((w) => !clearedWords.includes(w));
+
       if (remainingWords.length > 0 && engineRef.current) {
-        const currentTargetWord = remainingWords[hintIndex % remainingWords.length];
-        const firstChar = currentTargetWord[0];
-        engineRef.current.showHint(firstChar);
-        setHintIndex((prev) => prev + 1);
+        // 아직 전체 글자가 다 열리지 않은 단어 찾기
+        const targetWord = remainingWords.find(
+          (w) => (revealedCountMap[w] || 0) < w.length
+        ) || remainingWords[0];
+
+        const currentRevealed = revealedCountMap[targetWord] || 0;
+        const nextRevealed = Math.min(targetWord.length, currentRevealed + 1);
+
+        // 상태 업데이트: 해당 단어의 노출 글자 수 1 증가
+        setRevealedCountMap((prev) => ({
+          ...prev,
+          [targetWord]: nextRevealed,
+        }));
+
+        // 방금 열린 글자를 캔버스 보드에서도 하이라이트
+        const revealedChar = targetWord[nextRevealed - 1];
+        engineRef.current.showHint(revealedChar);
       }
+
       setIsHintModalOpen(false);
       setHintPassword('');
       setHintError(false);
@@ -93,7 +112,7 @@ export const WordTowerBoard: React.FC<Props> = ({
       {/* 1. 상단 헤더 영역 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         
-        {/* 상단 1열: 스테이지 뱃지, 타이틀, 액션 버튼 3종 */}
+        {/* 상단 1열 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <button
@@ -119,7 +138,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             </h1>
           </div>
 
-          {/* 액션 버튼 그룹 (❓, 💡, ↺) */}
+          {/* 액션 버튼 그룹 */}
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
             <button
               onClick={() => setIsHelpModalOpen(true)}
@@ -187,7 +206,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 상단 2열: 안내 문구 & 남은 단어 배지 */}
+        {/* 상단 2열 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, whiteSpace: 'nowrap' }}>
             숨겨진 6개 단어를 드래그해 완성하세요
@@ -210,7 +229,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 2. 글자 수 힌트 블라인드 슬롯 (6단어) */}
+        {/* 2. 힌트 누적 반영 슬롯 (힌트 쓴 만큼 글자 오픈) */}
         <div
           style={{
             display: 'grid',
@@ -224,6 +243,12 @@ export const WordTowerBoard: React.FC<Props> = ({
         >
           {stage.targetWords.map((word, idx) => {
             const isCleared = clearedWords.includes(word);
+            const revealedCount = revealedCountMap[word] || 0;
+
+            // 힌트로 열린 글자 + 남은 블라인드 점(●) 조합
+            const visiblePart = word.slice(0, revealedCount);
+            const hiddenPart = '●'.repeat(Math.max(0, word.length - revealedCount));
+
             return (
               <div
                 key={idx}
@@ -233,8 +258,16 @@ export const WordTowerBoard: React.FC<Props> = ({
                   justifyContent: 'center',
                   height: '28px',
                   borderRadius: '6px',
-                  background: isCleared ? 'rgba(37, 99, 235, 0.25)' : '#1e293b',
-                  border: isCleared ? '1px solid #3b82f6' : '1px dashed #475569',
+                  background: isCleared
+                    ? 'rgba(37, 99, 235, 0.25)'
+                    : revealedCount > 0
+                    ? 'rgba(234, 179, 8, 0.15)'
+                    : '#1e293b',
+                  border: isCleared
+                    ? '1px solid #3b82f6'
+                    : revealedCount > 0
+                    ? '1px solid #eab308'
+                    : '1px dashed #475569',
                   transition: 'all 0.25s ease',
                 }}
               >
@@ -243,9 +276,20 @@ export const WordTowerBoard: React.FC<Props> = ({
                     {word}
                   </span>
                 ) : (
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '2px' }}>
-                    {'●'.repeat(word.length)}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                    {/* 힌트로 열린 앞 글자들 (황금색 표시) */}
+                    {visiblePart && (
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#facc15', letterSpacing: '0.5px' }}>
+                        {visiblePart}
+                      </span>
+                    )}
+                    {/* 아직 안 열린 글자들 */}
+                    {hiddenPart && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', letterSpacing: '1.5px', marginLeft: visiblePart ? '2px' : '0' }}>
+                        {hiddenPart}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -254,7 +298,7 @@ export const WordTowerBoard: React.FC<Props> = ({
 
       </div>
 
-      {/* 3. 캔버스 영역 (5행 4열 보드) */}
+      {/* 3. 캔버스 영역 */}
       <div
         ref={containerRef}
         style={{
@@ -268,7 +312,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
-      {/* 게임 설명서 모달 */}
+      {/* 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
@@ -319,7 +363,7 @@ export const WordTowerBoard: React.FC<Props> = ({
               <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', borderLeft: '3px solid #10b981' }}>
                 <strong style={{ color: '#f8fafc' }}>3. 막혔을 때의 팁</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8' }}>
-                  순서가 꼬였다면 <strong>↺ (다시하기)</strong> 버튼으로 초기 배치로 되돌리세요. 첫 글자가 안 보일 땐 <strong>💡 (힌트)</strong>를 활용할 수 있습니다.
+                  순서가 꼬였다면 <strong>↺ (다시하기)</strong> 버튼으로 초기 배치로 되돌리세요. 글자가 안 보일 땐 <strong>💡 (힌트)</strong>를 누를 때마다 단어의 글자가 하나씩 열립니다.
                 </p>
               </div>
             </div>
@@ -372,7 +416,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>💡</div>
             <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#f8fafc', margin: '0 0 6px 0' }}>힌트 잠금 해제</h3>
             <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 16px 0' }}>
-              암호를 입력하면 첫 글자를 짚어줍니다.
+              암호를 입력하면 다음 글자를 하나씩 알려줍니다.
             </p>
 
             <input
