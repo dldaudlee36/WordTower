@@ -2,114 +2,157 @@ import type { StageData, GridData, TileData } from '../types/game';
 import { wordService, createSeededRandom } from '../services/wordService';
 
 export class LevelGenerator {
-  private readonly directions = [
-    [-1, 0], [1, 0], [0, -1], [0, 1],
-    [-1, -1], [-1, 1], [1, -1], [1, 1]
-  ];
-
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
     const words = wordService.getStageWordsForSeed(stageNumber);
+    const prng = createSeededRandom(stageNumber * 1009 + 37);
 
-    // 단일 시도 실패 방지: 유효 배치가 나올 때까지 결정론적 오프셋 루프 실행
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const prng = createSeededRandom(stageNumber * 1009 + 37 + attempt * 17);
-      const grid = this.generateGridWithSeed(rows, cols, words, prng);
-
-      if (grid) {
-        return {
-          rows,
-          cols,
-          targetWords: words,
-          grid: grid as GridData // Nullable 타입 에러 완전 해결
-        };
+    // 1. 20개 셀의 기본 좌표 생성
+    const cells: [number, number][] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        cells.push([r, c]);
       }
     }
 
-    throw new Error(`스테이지 ${stageNumber} 배치 생성 실패`);
+    // 2. 단어 길이: 4음절 2개, 3음절 4개 (총 20자)
+    // 항상 인접한 경로를 보장하는 스네이크/블록형 연속 경로 생성
+    const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+    // 결정론적 그리드 생성 (연산 멈춤 없는 고속 경로 할당)
+    const success = this.fastGenerate(grid, rows, cols, words, prng);
+
+    if (!success) {
+      // 만에 하나 실패 시 안전 폴백 (지그재그 연속 배치)
+      this.fallbackGenerate(grid, rows, cols, words);
+    }
+
+    return {
+      rows,
+      cols,
+      targetWords: words,
+      grid: grid as GridData,
+    };
   }
 
-  private generateGridWithSeed(
+  private fastGenerate(
+    grid: (TileData | null)[][],
     rows: number,
     cols: number,
     words: string[],
     prng: () => number
-  ): (TileData | null)[][] | null {
-    const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
+  ): boolean {
+    const directions = [
+      [-1, 0], [1, 0], [0, -1], [0, 1],
+      [-1, -1], [-1, 1], [1, -1], [1, 1]
+    ];
 
-    const backtrack = (wordIdx: number): boolean => {
-      if (wordIdx >= words.length) return true;
-      const word = words[wordIdx];
-
-      const emptyCells: [number, number][] = [];
+    for (let attempt = 0; attempt < 50; attempt++) {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (grid[r][c] === null) emptyCells.push([r, c]);
+          grid[r][c] = null;
         }
       }
-      this.shuffleWithSeed(emptyCells, prng);
 
-      for (const [sr, sc] of emptyCells) {
-        const path: [number, number][] = [[sr, sc]];
-        if (this.dfsPlaceLetters(grid, rows, cols, word, 1, path, wordIdx, prng)) {
-          if (backtrack(wordIdx + 1)) return true;
-          for (const [pr, pc] of path) grid[pr][pc] = null;
+      let failed = false;
+
+      for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+        const word = words[wordIdx];
+        const emptyCells: [number, number][] = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (grid[r][c] === null) emptyCells.push([r, c]);
+          }
+        }
+
+        this.shuffleWithSeed(emptyCells, prng);
+        let placed = false;
+
+        for (const [startR, startC] of emptyCells) {
+          const path: [number, number][] = [[startR, startC]];
+
+          const dfs = (charIdx: number): boolean => {
+            if (charIdx >= word.length) return true;
+            const [pr, pc] = path[path.length - 1];
+
+            const neighbors: [number, number][] = [];
+            for (const [dr, dc] of directions) {
+              const nr = pr + dr;
+              const nc = pc + dc;
+              if (
+                nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
+                grid[nr][nc] === null &&
+                !path.some(([xr, xc]) => xr === nr && xc === nc)
+              ) {
+                neighbors.push([nr, nc]);
+              }
+            }
+            this.shuffleWithSeed(neighbors, prng);
+
+            for (const [nr, nc] of neighbors) {
+              path.push([nr, nc]);
+              if (dfs(charIdx + 1)) return true;
+              path.pop();
+            }
+            return false;
+          };
+
+          if (dfs(1)) {
+            path.forEach(([r, c], idx) => {
+              grid[r][c] = {
+                id: `tile_${r}_${c}_${wordIdx}_${idx}`,
+                char: word[idx],
+                wordId: wordIdx,
+                row: r,
+                col: c,
+              };
+            });
+            placed = true;
+            break;
+          }
+        }
+
+        if (!placed) {
+          failed = true;
+          break;
         }
       }
-      return false;
-    };
 
-    return backtrack(0) ? grid : null;
-  }
-
-  private dfsPlaceLetters(
-    grid: (TileData | null)[][],
-    rows: number,
-    cols: number,
-    word: string,
-    charIndex: number,
-    path: [number, number][],
-    wordId: number,
-    prng: () => number
-  ): boolean {
-    if (charIndex >= word.length) {
-      path.forEach(([r, c], idx) => {
-        grid[r][c] = {
-          id: `tile_${r}_${c}_${wordId}_${idx}`,
-          char: word[idx],
-          wordId,
-          row: r,
-          col: c
-        };
-      });
-      return true;
-    }
-
-    const [pr, pc] = path[path.length - 1];
-    const neighbors: [number, number][] = [];
-
-    for (const [dr, dc] of this.directions) {
-      const nr = pr + dr;
-      const nc = pc + dc;
-      if (
-        nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
-        grid[nr][nc] === null &&
-        !path.some(([xr, xc]) => xr === nr && xc === nc)
-      ) {
-        neighbors.push([nr, nc]);
-      }
-    }
-
-    this.shuffleWithSeed(neighbors, prng);
-
-    for (const [nr, nc] of neighbors) {
-      path.push([nr, nc]);
-      if (this.dfsPlaceLetters(grid, rows, cols, word, charIndex + 1, path, wordId, prng)) {
-        return true;
-      }
-      path.pop();
+      if (!failed) return true;
     }
 
     return false;
+  }
+
+  // 절대 멈추지 않는 구조적 인접 지그재그 배치 폴백
+  private fallbackGenerate(
+    grid: (TileData | null)[][],
+    rows: number,
+    cols: number,
+    words: string[]
+  ) {
+    const snakePath: [number, number][] = [];
+    for (let r = 0; r < rows; r++) {
+      const rowCells: [number, number][] = [];
+      for (let c = 0; c < cols; c++) {
+        rowCells.push([r, c]);
+      }
+      if (r % 2 === 1) rowCells.reverse();
+      snakePath.push(...rowCells);
+    }
+
+    let cellIndex = 0;
+    words.forEach((word, wordIdx) => {
+      for (let i = 0; i < word.length; i++) {
+        const [r, c] = snakePath[cellIndex++];
+        grid[r][c] = {
+          id: `tile_${r}_${c}_${wordIdx}_${i}`,
+          char: word[i],
+          wordId: wordIdx,
+          row: r,
+          col: c,
+        };
+      }
+    });
   }
 
   private shuffleWithSeed<T>(array: T[], prng: () => number) {
