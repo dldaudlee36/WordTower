@@ -37,15 +37,22 @@ export const WordTowerBoard: React.FC<Props> = ({
   const [hintError, setHintError] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
-  // 친절한 오답 안내 토스트 상태
+  // 브라우저 표준 타이머 타입 적용 (TS2503 완전 해결)
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
     toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2500);
   };
+
+  // 스테이지 번호 변경 시 맞춘 단어 목록 동기화
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    setClearedWords(saved ? JSON.parse(saved) : []);
+    setRevealedCountMap({});
+  }, [globalStageNumber, storageKey]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -55,7 +62,7 @@ export const WordTowerBoard: React.FC<Props> = ({
       container: containerRef.current,
       rows: stage.rows,
       cols: stage.cols,
-      onWordSubmit: (selectedChars, _) => {
+      onWordSubmit: (selectedChars) => {
         const word = selectedChars.join('');
         if (stage.targetWords.includes(word) && !clearedWords.includes(word)) {
           setClearedWords((prev) => {

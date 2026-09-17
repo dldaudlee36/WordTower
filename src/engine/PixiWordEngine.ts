@@ -7,7 +7,7 @@ interface EngineConfig {
   rows: number;
   cols: number;
   onWordSubmit: (selectedChars: string[], tileIds: string[]) => boolean;
-  onInvalidSubmit: () => void; // 잘못된 단어 입력 시 콜백
+  onInvalidSubmit: () => void;
 }
 
 export class PixiWordEngine {
@@ -28,7 +28,6 @@ export class PixiWordEngine {
   private onInvalidSubmit: () => void;
   private currentGrid: GridData = [];
   private clearedTileIds: Set<string> = new Set();
-  private currentHintTileId: string | null = null;
 
   constructor(config: EngineConfig) {
     this.container = config.container;
@@ -226,7 +225,6 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      // 중력 없이 타일 완료 상태(비활성화)로 전환
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
@@ -239,7 +237,6 @@ export class PixiWordEngine {
         }
       });
     } else {
-      // 오답: 흔들림 애니메이션 및 친절한 안내 콜백
       this.selectedTiles.forEach((t) => {
         const sprite = this.tileSprites.get(t.id);
         if (sprite) {

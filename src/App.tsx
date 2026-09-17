@@ -30,11 +30,11 @@ export default function App() {
       .catch((err) => console.error('단어 DB 로드 실패:', err));
   }, []);
 
-  // 결정론적 고정 스테이지 생성 (모든 유저 동일 정답/동일 배치)
+  // 결정론적 고정 스테이지 생성 (gameKey 의존성 추가로 다시하기 완벽 지원)
   const currentStage: StageData | null = useMemo(() => {
     if (!isDbLoaded) return null;
     return generator.createDeterminedStage(currentGlobalStage, 5, 4);
-  }, [isDbLoaded, currentGlobalStage, generator]);
+  }, [isDbLoaded, currentGlobalStage, gameKey, generator]);
 
   const currentChapter = Math.ceil(currentGlobalStage / STAGES_PER_CHAPTER);
   const stageInChapter = ((currentGlobalStage - 1) % STAGES_PER_CHAPTER) + 1;
@@ -64,7 +64,6 @@ export default function App() {
   };
 
   const handleResetStage = () => {
-    // 다시하기 시 보드 리마운트 (이미 맞춘 단어는 로컬스토리지에서 복원됨)
     setGameKey((prev) => prev + 1);
   };
 

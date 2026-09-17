@@ -9,19 +9,23 @@ export class LevelGenerator {
 
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
     const words = wordService.getStageWordsForSeed(stageNumber);
-    const prng = createSeededRandom(stageNumber * 1009 + 37);
 
-    const grid = this.generateGridWithSeed(rows, cols, words, prng);
-    if (!grid) {
-      throw new Error(`스테이지 ${stageNumber} 배치 생성 실패`);
+    // 단일 시도 실패 방지: 유효 배치가 나올 때까지 결정론적 오프셋 루프 실행
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const prng = createSeededRandom(stageNumber * 1009 + 37 + attempt * 17);
+      const grid = this.generateGridWithSeed(rows, cols, words, prng);
+
+      if (grid) {
+        return {
+          rows,
+          cols,
+          targetWords: words,
+          grid: grid as GridData // Nullable 타입 에러 완전 해결
+        };
+      }
     }
 
-    return {
-      rows,
-      cols,
-      targetWords: words,
-      grid
-    };
+    throw new Error(`스테이지 ${stageNumber} 배치 생성 실패`);
   }
 
   private generateGridWithSeed(
@@ -29,14 +33,13 @@ export class LevelGenerator {
     cols: number,
     words: string[],
     prng: () => number
-  ): GridData | null {
+  ): (TileData | null)[][] | null {
     const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
 
     const backtrack = (wordIdx: number): boolean => {
       if (wordIdx >= words.length) return true;
       const word = words[wordIdx];
 
-      // 빈 칸 좌표 탐색
       const emptyCells: [number, number][] = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -49,7 +52,6 @@ export class LevelGenerator {
         const path: [number, number][] = [[sr, sc]];
         if (this.dfsPlaceLetters(grid, rows, cols, word, 1, path, wordIdx, prng)) {
           if (backtrack(wordIdx + 1)) return true;
-          // 실패 시 롤백
           for (const [pr, pc] of path) grid[pr][pc] = null;
         }
       }

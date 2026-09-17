@@ -1,4 +1,4 @@
-export type WordDatabase = Record<number, string[]>;
+export type WordDatabase = Record<string | number, string[]>;
 
 // 시드 기반 의사난수 생성기 (Mulberry32)
 export function createSeededRandom(seed: number) {
@@ -21,8 +21,8 @@ class WordService {
     if (!response.ok) {
       throw new Error('단어 DB 파일을 불러오지 못했습니다.');
     }
-    this.db = await response.json();
-    return this.db!;
+    this.db = (await response.json()) as WordDatabase;
+    return this.db;
   }
 
   /**
@@ -32,8 +32,12 @@ class WordService {
     if (!this.db) throw new Error('단어 DB가 초기화되지 않았습니다.');
 
     const prng = createSeededRandom(stageNumber * 997 + 13);
-    const words4 = [...(this.db[4] || [])].sort();
-    const words3 = [...(this.db[3] || [])].sort();
+    const words4 = [...(this.db['4'] || this.db[4] || [])].sort();
+    const words3 = [...(this.db['3'] || this.db[3] || [])].sort();
+
+    if (words4.length < 2 || words3.length < 4) {
+      throw new Error(`단어 DB 풀이 부족합니다. (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
+    }
 
     const chosen: string[] = [];
 
@@ -41,14 +45,16 @@ class WordService {
     const pool4 = [...words4];
     for (let i = 0; i < 2; i++) {
       const idx = Math.floor(prng() * pool4.length);
-      chosen.push(pool4.splice(idx, 1)[0]);
+      const selected = pool4.splice(idx, 1)[0];
+      if (selected) chosen.push(selected);
     }
 
     // 3음절 단어 4개 결정론적 선택
     const pool3 = [...words3];
     for (let i = 0; i < 4; i++) {
       const idx = Math.floor(prng() * pool3.length);
-      chosen.push(pool3.splice(idx, 1)[0]);
+      const selected = pool3.splice(idx, 1)[0];
+      if (selected) chosen.push(selected);
     }
 
     return chosen;
