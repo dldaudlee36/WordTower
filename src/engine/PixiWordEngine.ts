@@ -44,23 +44,22 @@ export class PixiWordEngine {
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
-    // 맞춘 단어 타일만 추출하여 비활성화 목록에 등록
-    initialClearedWords.forEach((clearedWord) => {
-      for (let r = 0; r < this.rows; r++) {
-        for (let c = 0; c < this.cols; c++) {
-          const t = this.currentGrid[r][c];
-          if (t && t.id.includes(`_${clearedWord}_`)) {
-            this.clearedTileIds.add(t.id);
-          }
+    // [핵심] tile.word와 정확히 일치하는 타일만 클리어 Set에 등록
+    const clearedSet = new Set(initialClearedWords);
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const tile = this.currentGrid[r][c];
+        if (tile && clearedSet.has(tile.word)) {
+          this.clearedTileIds.add(tile.id);
         }
       }
-    });
+    }
 
     await this.app.init({
       resizeTo: this.container,
-      backgroundColor: 0x070b14, // 전체 배경을 더 어둡게 하여 활성 타일 강조
+      backgroundColor: 0x070b14,
       antialias: true,
-      resolution: window.devicePixelRatio || 2, // 해상도 2배로 텍스트 뭉개짐 방지
+      resolution: window.devicePixelRatio || 2,
       autoDensity: true,
     });
 
@@ -81,21 +80,21 @@ export class PixiWordEngine {
   }
 
   private renderTiles() {
-    // 1. [핵심] 안 맞춘 타일: 쨍하고 굵은 100% 순백색 폰트
+    // 활성 텍스트: 완전 불투명 화이트 볼드
     const activeTextStyle = new TextStyle({
       fontSize: 28,
       fill: '#ffffff',
       fontWeight: '900',
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      stroke: { color: '#0f172a', width: 2 }, // 외곽선으로 또렷함 극대화
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      stroke: { color: '#0f172a', width: 2 },
     });
 
-    // 2. 맞춘 타일: 완전히 불 꺼진 어두운 폰트
+    // 소등 텍스트: 어두운 먹색
     const clearedTextStyle = new TextStyle({
       fontSize: 26,
       fill: '#1e293b',
       fontWeight: 'bold',
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
     });
 
     for (let r = 0; r < this.rows; r++) {
@@ -114,10 +113,9 @@ export class PixiWordEngine {
         bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
 
         if (isCleared) {
-          // 맞춘 타일: 완전히 꺼진 먹색
           bg.fill({ color: 0x050811, alpha: 0.6 });
         } else {
-          // [핵심] 안 맞춘 타일: 밝고 뚜렷한 슬레이트 블루 + 선명한 하늘색 테두리
+          // 선명한 블루 그레이 + 테두리
           bg.fill({ color: 0x334155, alpha: 1 });
           bg.stroke({ width: 2, color: 0x64748b, alpha: 0.9 });
         }
@@ -213,11 +211,9 @@ export class PixiWordEngine {
     sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
 
     if (isSelected) {
-      // 드래그 중인 타일: 쨍한 파란색
       sprite.bg.fill({ color: 0x2563eb, alpha: 1 });
       sprite.bg.stroke({ width: 2.5, color: 0x93c5fd });
     } else {
-      // 선택 해제 시: 원래의 밝고 뚜렷한 슬레이트 블루로 복귀
       sprite.bg.fill({ color: 0x334155, alpha: 1 });
       sprite.bg.stroke({ width: 2, color: 0x64748b, alpha: 0.9 });
     }
@@ -248,7 +244,7 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      // 정답인 타일들만 완전 소등(어두운 먹색) 처리
+      // 맞춘 타일만 개별 소등
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
@@ -263,7 +259,6 @@ export class PixiWordEngine {
         }
       });
     } else {
-      // 오답 시: 원래의 밝은 슬레이트 색상으로 복구
       this.selectedTiles.forEach((t) => {
         const sprite = this.tileSprites.get(t.id);
         if (sprite) {
@@ -278,12 +273,18 @@ export class PixiWordEngine {
     this.lineGraphics.clear();
   }
 
-  public showHint(firstChar: string): boolean {
+  // [핵심 보강] 정확히 해당 단어의 해당 글자 위치(charIndex) 타일을 찾아 힌트 표시
+  public showHintForWord(targetWord: string, charIndex: number): boolean {
     let targetTile: TileData | null = null;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const t = this.currentGrid[r][c];
-        if (t && t.char === firstChar && !this.clearedTileIds.has(t.id)) {
+        if (
+          t &&
+          t.word === targetWord &&
+          t.charIndex === charIndex &&
+          !this.clearedTileIds.has(t.id)
+        ) {
           targetTile = t;
           break;
         }
@@ -314,7 +315,7 @@ export class PixiWordEngine {
         this.app.destroy(true, { children: true });
       }
     } catch (e) {
-      console.warn('Pixi destroy cleanup error:', e);
+      console.warn('Pixi cleanup warn:', e);
     }
   }
 }
