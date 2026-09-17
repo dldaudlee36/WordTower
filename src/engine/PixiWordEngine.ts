@@ -245,7 +245,7 @@ export class PixiWordEngine {
 
     const chars = this.selectedTiles.map((t) => t.char);
     const ids = this.selectedTiles.map((t) => t.id);
-    const isSuccess = this.onWordSubmit(chars, ids);
+    const isSuccess = this.onWordSubmit(chars); // chars만 전달
 
     if (isSuccess) {
       ids.forEach((id) => {
