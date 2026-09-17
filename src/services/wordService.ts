@@ -1,6 +1,5 @@
 export type WordDatabase = Record<string | number, string[]>;
 
-// 시드 기반 의사난수 생성기 (Mulberry32)
 export function createSeededRandom(seed: number) {
   let s = seed;
   return function () {
@@ -25,39 +24,48 @@ class WordService {
     return this.db;
   }
 
-  /**
-   * 특정 stageNumber를 시드로 사용하여 항상 일정한 6개 단어 추출 (4음절 2개 + 3음절 4개)
-   */
   public getStageWordsForSeed(stageNumber: number): string[] {
     if (!this.db) throw new Error('단어 DB가 초기화되지 않았습니다.');
 
     const prng = createSeededRandom(stageNumber * 997 + 13);
-    const words4 = [...(this.db['4'] || this.db[4] || [])].sort();
-    const words3 = [...(this.db['3'] || this.db[3] || [])].sort();
+
+    // [핵심] 공백/특수문자 없이 정확히 4글자, 3글자인 순수 단어만 필터링
+    const raw4 = this.db['4'] || this.db[4] || [];
+    const raw3 = this.db['3'] || this.db[3] || [];
+
+    const words4 = raw4
+      .map((w) => w.trim())
+      .filter((w) => w.length === 4 && /^[가-힣]+$/.test(w))
+      .sort();
+
+    const words3 = raw3
+      .map((w) => w.trim())
+      .filter((w) => w.length === 3 && /^[가-힣]+$/.test(w))
+      .sort();
 
     if (words4.length < 2 || words3.length < 4) {
-      throw new Error(`단어 DB 풀이 부족합니다. (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
+      throw new Error(`정제된 단어 풀이 부족합니다. (4음절: ${words4.length}개, 3음절: ${words3.length}개)`);
     }
 
     const chosen: string[] = [];
 
-    // 4음절 단어 2개 결정론적 선택
+    // 4음절 단어 정확히 2개 선택 (총 8칸)
     const pool4 = [...words4];
     for (let i = 0; i < 2; i++) {
       const idx = Math.floor(prng() * pool4.length);
-      const selected = pool4.splice(idx, 1)[0];
-      if (selected) chosen.push(selected);
+      const sel = pool4.splice(idx, 1)[0];
+      if (sel) chosen.push(sel);
     }
 
-    // 3음절 단어 4개 결정론적 선택
+    // 3음절 단어 정확히 4개 선택 (총 12칸)
     const pool3 = [...words3];
     for (let i = 0; i < 4; i++) {
       const idx = Math.floor(prng() * pool3.length);
-      const selected = pool3.splice(idx, 1)[0];
-      if (selected) chosen.push(selected);
+      const sel = pool3.splice(idx, 1)[0];
+      if (sel) chosen.push(sel);
     }
 
-    return chosen;
+    return chosen; // 정확히 6개 단어, 총합 20자
   }
 }
 
