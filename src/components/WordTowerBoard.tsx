@@ -24,8 +24,8 @@ export const WordTowerBoard: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<PixiWordEngine | null>(null);
 
-  // 깨진 이전 캐시와 분리하기 위한 버전형 스토리지 키
-  const storageKey = `wt_cleared_words_v5_stage_${globalStageNumber}`;
+  // 버전 v6로 갱신 (오염 데이터 완전 배제)
+  const storageKey = `wt_cleared_words_v6_stage_${globalStageNumber}`;
   const [clearedWords, setClearedWords] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
@@ -71,7 +71,7 @@ export const WordTowerBoard: React.FC<Props> = ({
             }
             return next;
           });
-          return true; // 오직 이 단어의 타일들만 PixiWordEngine에서 음영 처리됨
+          return true;
         }
         return false;
       },
@@ -81,7 +81,6 @@ export const WordTowerBoard: React.FC<Props> = ({
     });
 
     const clonedGrid = JSON.parse(JSON.stringify(stage.grid));
-    // [수정] 2개 인자만 전달: 그리드와 이미 맞춘 단어 배열
     engine.init(clonedGrid, clearedWords);
     engineRef.current = engine;
 
@@ -107,8 +106,8 @@ export const WordTowerBoard: React.FC<Props> = ({
           [targetWord]: nextRevealed,
         }));
 
-        const revealedChar = targetWord[nextRevealed - 1];
-        engineRef.current.showHint(revealedChar);
+        // 정확한 글자 위치(charIndex)로 힌트 전송
+        engineRef.current.showHintForWord(targetWord, currentRevealed);
       }
       setIsHintModalOpen(false);
       setHintPassword('');
@@ -144,7 +143,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* 상단 헤더 영역 */}
+      {/* 상단 헤더 */}
       <div style={{ width: '100%', maxWidth: '360px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -260,7 +259,7 @@ export const WordTowerBoard: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 6개 단어 슬롯: 4글자 2개, 3글자 4개만 정확히 노출 */}
+        {/* 힌트 슬롯 (4글자 2개, 3글자 4개) */}
         <div
           style={{
             display: 'grid',
@@ -330,7 +329,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         style={{
           width: '360px',
           height: '430px',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#070b14',
           borderRadius: '16px',
           border: '1px solid #334155',
           overflow: 'hidden',
@@ -338,7 +337,7 @@ export const WordTowerBoard: React.FC<Props> = ({
         }}
       />
 
-      {/* 게임 설명서 모달 */}
+      {/* 설명서 모달 */}
       {isHelpModalOpen && (
         <div
           style={{
