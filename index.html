@@ -1,12 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>word-tower-web</title>
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>워드타워 - 단어 퍼즐 게임</title>
+    <!-- 오픈그래프 메타태그 -->
+    <meta property="og:title" content="워드타워 (Word Tower)" />
+    <meta property="og:description" content="숨겨진 단어를 찾아 타워를 무너뜨리세요!" />
+    <meta property="og:type" content="website" />
+    <style>
+      /* 모바일 드래그 시 전체 스크롤/바운스 방지 */
+      html, body {
+        overflow: hidden;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+    </style>
   </head>
-  <body>
+  <body class="bg-slate-950">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
