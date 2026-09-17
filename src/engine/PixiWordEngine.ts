@@ -6,7 +6,7 @@ interface EngineConfig {
   container: HTMLElement;
   rows: number;
   cols: number;
-  onWordSubmit: (selectedChars: string[], tileIds: string[]) => boolean;
+  onWordSubmit: (selectedChars: string[]) => boolean; // 단일 인자로 통일
   onInvalidSubmit: () => void;
 }
 
