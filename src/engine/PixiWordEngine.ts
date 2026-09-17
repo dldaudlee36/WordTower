@@ -10,6 +10,21 @@ interface EngineConfig {
   onInvalidSubmit: () => void;
 }
 
+const ACTIVE_TEXT_STYLE = new TextStyle({
+  fontSize: 28,
+  fill: '#ffffff',
+  fontWeight: '900',
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+  stroke: { color: '#0f172a', width: 2 },
+});
+
+const CLEARED_TEXT_STYLE = new TextStyle({
+  fontSize: 26,
+  fill: '#1e293b',
+  fontWeight: 'bold',
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+});
+
 export class PixiWordEngine {
   private app: Application;
   private container: HTMLElement;
@@ -44,7 +59,6 @@ export class PixiWordEngine {
     this.currentGrid = initialGrid;
     this.clearedTileIds.clear();
 
-    // [핵심] tile.word와 정확히 일치하는 타일만 클리어 Set에 등록
     const clearedSet = new Set(initialClearedWords);
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
@@ -80,23 +94,6 @@ export class PixiWordEngine {
   }
 
   private renderTiles() {
-    // 활성 텍스트: 완전 불투명 화이트 볼드
-    const activeTextStyle = new TextStyle({
-      fontSize: 28,
-      fill: '#ffffff',
-      fontWeight: '900',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      stroke: { color: '#0f172a', width: 2 },
-    });
-
-    // 소등 텍스트: 어두운 먹색
-    const clearedTextStyle = new TextStyle({
-      fontSize: 26,
-      fill: '#1e293b',
-      fontWeight: 'bold',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    });
-
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
@@ -115,16 +112,15 @@ export class PixiWordEngine {
         if (isCleared) {
           bg.fill({ color: 0x050811, alpha: 0.6 });
         } else {
-          // 선명한 블루 그레이 + 테두리
           bg.fill({ color: 0x334155, alpha: 1 });
           bg.stroke({ width: 2, color: 0x64748b, alpha: 0.9 });
         }
 
         const txt = new Text({
           text: tile.char,
-          style: isCleared ? clearedTextStyle : activeTextStyle,
+          style: isCleared ? CLEARED_TEXT_STYLE.clone() : ACTIVE_TEXT_STYLE.clone(),
         });
-        txt.alpha = isCleared ? 0.35 : 1.0;
+        txt.alpha = isCleared ? 0.3 : 1.0;
         txt.anchor.set(0.5);
         txt.position.set(this.tileSize / 2, this.tileSize / 2);
 
@@ -244,7 +240,6 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      // 맞춘 타일만 개별 소등
       ids.forEach((id) => {
         this.clearedTileIds.add(id);
         const sprite = this.tileSprites.get(id);
@@ -252,9 +247,8 @@ export class PixiWordEngine {
           sprite.bg.clear();
           sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 14);
           sprite.bg.fill({ color: 0x050811, alpha: 0.6 });
-          sprite.text.style.fill = '#1e293b';
-          sprite.text.style.stroke = { color: 'transparent', width: 0 };
-          sprite.text.alpha = 0.35;
+          sprite.text.style = CLEARED_TEXT_STYLE.clone();
+          sprite.text.alpha = 0.3;
           gsap.fromTo(sprite.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.15 });
         }
       });
@@ -273,7 +267,6 @@ export class PixiWordEngine {
     this.lineGraphics.clear();
   }
 
-  // [핵심 보강] 정확히 해당 단어의 해당 글자 위치(charIndex) 타일을 찾아 힌트 표시
   public showHintForWord(targetWord: string, charIndex: number): boolean {
     let targetTile: TileData | null = null;
     for (let r = 0; r < this.rows; r++) {
