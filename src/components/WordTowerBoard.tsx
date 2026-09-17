@@ -108,24 +108,32 @@ export const WordTowerBoard: React.FC<Props> = ({
     };
   }, [stage, globalStageNumber]);
 
-  const handleApplyHint = () => {
+const handleApplyHint = () => {
     if (hintPassword.trim() === '대전a반최고') {
       const remainingWords = stage.targetWords.filter((w) => !clearedWordsRef.current.includes(w));
-      if (remainingWords.length > 0 && engineRef.current) {
-        const targetWord = remainingWords.find(
-          (w) => (revealedCountMap[w] || 0) < w.length
-        ) || remainingWords[0];
+      
+      // 아직 모든 글자가 다 공개되지 않은 단어만 선별
+      const eligibleWord = remainingWords.find(
+        (w) => (revealedCountMap[w] || 0) < w.length
+      );
 
-        const currentRevealed = revealedCountMap[targetWord] || 0;
-        const nextRevealed = Math.min(targetWord.length, currentRevealed + 1);
+      if (eligibleWord && engineRef.current) {
+        const currentRevealed = revealedCountMap[eligibleWord] || 0;
+        
+        // 글자 수 내에서만 안전하게 힌트 표시
+        if (currentRevealed < eligibleWord.length) {
+          const nextRevealed = currentRevealed + 1;
+          setRevealedCountMap((prev) => ({
+            ...prev,
+            [eligibleWord]: nextRevealed,
+          }));
 
-        setRevealedCountMap((prev) => ({
-          ...prev,
-          [targetWord]: nextRevealed,
-        }));
-
-        engineRef.current.showHintForWord(targetWord, currentRevealed);
+          engineRef.current.showHintForWord(eligibleWord, currentRevealed);
+        }
+      } else {
+        showToast('더 이상 표시할 힌트가 없습니다!');
       }
+
       setIsHintModalOpen(false);
       setHintPassword('');
       setHintError(false);
