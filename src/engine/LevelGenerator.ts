@@ -3,17 +3,12 @@ import { wordService, createSeededRandom } from '../services/wordService';
 
 export class LevelGenerator {
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
-    const rawWords = wordService.getStageWordsForSeed(stageNumber);
+    const words = wordService.getStageWordsForSeed(stageNumber);
     const prng = createSeededRandom(stageNumber * 1009 + 37);
 
-    // 총 20칸(rows * cols)에 맞춰 단어 목록 정돈
-    const words = [...rawWords];
     const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
 
-    // 1. 고속 경로 생성 시도
     const success = this.fastGenerate(grid, rows, cols, words, prng);
-
-    // 2. 실패 시 안전한 지그재그 경로 폴백
     if (!success) {
       this.fallbackGenerate(grid, rows, cols, words);
     }
@@ -91,7 +86,8 @@ export class LevelGenerator {
           if (dfs(1)) {
             path.forEach(([r, c], idx) => {
               grid[r][c] = {
-                id: `tile_${r}_${c}_${wordIdx}_${idx}`,
+                // ID에 단어 원본을 직접 각인하여 오인식 방지
+                id: `tile_${r}_${c}_${word}_${idx}`,
                 char: word[idx],
                 wordId: wordIdx,
                 row: r,
@@ -115,14 +111,12 @@ export class LevelGenerator {
     return false;
   }
 
-  // 절대 undefined 참조가 발생하지 않도록 바운더리 검사를 추가한 폴백 메서드
   private fallbackGenerate(
     grid: (TileData | null)[][],
     rows: number,
     cols: number,
     words: string[]
   ) {
-    // 20칸 초기화
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         grid[r][c] = null;
@@ -145,12 +139,10 @@ export class LevelGenerator {
     for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
       const word = words[wordIdx];
       for (let i = 0; i < word.length; i++) {
-        if (cellIndex >= maxCells || !snakePath[cellIndex]) {
-          return; // 20칸 초과 시 안전하게 조기 반환 (크래시 원천 차단)
-        }
+        if (cellIndex >= maxCells || !snakePath[cellIndex]) return;
         const [r, c] = snakePath[cellIndex];
         grid[r][c] = {
-          id: `tile_${r}_${c}_${wordIdx}_${i}`,
+          id: `tile_${r}_${c}_${word}_${i}`,
           char: word[i],
           wordId: wordIdx,
           row: r,
