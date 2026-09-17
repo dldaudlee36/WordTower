@@ -53,18 +53,21 @@ export default function App() {
     );
   }
 
-  const handleStageClear = () => {
-    setIsStageCleared(true);
-    if (currentStageIdx + 2 > maxUnlockedStage) {
-      setMaxUnlockedStage(currentStageIdx + 2);
-    }
-  };
+  // 기존 useState 선언부를 로컬스토리지 연동으로 교체
+const [maxUnlockedStage, setMaxUnlockedStage] = useState<number>(() => {
+  const saved = localStorage.getItem('wt_max_stage');
+  return saved ? parseInt(saved, 10) : 1;
+});
 
-  const handleNextStage = () => {
-    setCurrentStageIdx((prev) => prev + 1);
-    setIsStageCleared(false);
-    setGameKey((prev) => prev + 1);
-  };
+// 스테이지 클리어 핸들러 보강
+const handleStageClear = () => {
+  setIsStageCleared(true);
+  const nextStage = currentStageIdx + 2;
+  if (nextStage > maxUnlockedStage) {
+    setMaxUnlockedStage(nextStage);
+    localStorage.setItem('wt_max_stage', nextStage.toString());
+  }
+};
 
   const handleSelectStage = (index: number) => {
     setCurrentStageIdx(index);
