@@ -3,26 +3,18 @@ import { wordService, createSeededRandom } from '../services/wordService';
 
 export class LevelGenerator {
   public createDeterminedStage(stageNumber: number, rows = 5, cols = 4): StageData {
-    const words = wordService.getStageWordsForSeed(stageNumber);
+    const rawWords = wordService.getStageWordsForSeed(stageNumber);
     const prng = createSeededRandom(stageNumber * 1009 + 37);
 
-    // 1. 20개 셀의 기본 좌표 생성
-    const cells: [number, number][] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        cells.push([r, c]);
-      }
-    }
-
-    // 2. 단어 길이: 4음절 2개, 3음절 4개 (총 20자)
-    // 항상 인접한 경로를 보장하는 스네이크/블록형 연속 경로 생성
+    // 총 20칸(rows * cols)에 맞춰 단어 목록 정돈
+    const words = [...rawWords];
     const grid: (TileData | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
 
-    // 결정론적 그리드 생성 (연산 멈춤 없는 고속 경로 할당)
+    // 1. 고속 경로 생성 시도
     const success = this.fastGenerate(grid, rows, cols, words, prng);
 
+    // 2. 실패 시 안전한 지그재그 경로 폴백
     if (!success) {
-      // 만에 하나 실패 시 안전 폴백 (지그재그 연속 배치)
       this.fallbackGenerate(grid, rows, cols, words);
     }
 
@@ -46,7 +38,7 @@ export class LevelGenerator {
       [-1, -1], [-1, 1], [1, -1], [1, 1]
     ];
 
-    for (let attempt = 0; attempt < 50; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           grid[r][c] = null;
@@ -123,13 +115,20 @@ export class LevelGenerator {
     return false;
   }
 
-  // 절대 멈추지 않는 구조적 인접 지그재그 배치 폴백
+  // 절대 undefined 참조가 발생하지 않도록 바운더리 검사를 추가한 폴백 메서드
   private fallbackGenerate(
     grid: (TileData | null)[][],
     rows: number,
     cols: number,
     words: string[]
   ) {
+    // 20칸 초기화
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        grid[r][c] = null;
+      }
+    }
+
     const snakePath: [number, number][] = [];
     for (let r = 0; r < rows; r++) {
       const rowCells: [number, number][] = [];
@@ -141,9 +140,15 @@ export class LevelGenerator {
     }
 
     let cellIndex = 0;
-    words.forEach((word, wordIdx) => {
+    const maxCells = rows * cols;
+
+    for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+      const word = words[wordIdx];
       for (let i = 0; i < word.length; i++) {
-        const [r, c] = snakePath[cellIndex++];
+        if (cellIndex >= maxCells || !snakePath[cellIndex]) {
+          return; // 20칸 초과 시 안전하게 조기 반환 (크래시 원천 차단)
+        }
+        const [r, c] = snakePath[cellIndex];
         grid[r][c] = {
           id: `tile_${r}_${c}_${wordIdx}_${i}`,
           char: word[i],
@@ -151,8 +156,9 @@ export class LevelGenerator {
           row: r,
           col: c,
         };
+        cellIndex++;
       }
-    });
+    }
   }
 
   private shuffleWithSeed<T>(array: T[], prng: () => number) {
