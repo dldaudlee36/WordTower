@@ -7,6 +7,7 @@ interface EngineConfig {
   rows: number;
   cols: number;
   onWordSubmit: (selectedChars: string[], tileIds: string[]) => boolean;
+  onInvalidSubmit: () => void; // 잘못된 단어 입력 시 콜백
 }
 
 export class PixiWordEngine {
@@ -24,7 +25,9 @@ export class PixiWordEngine {
   private selectedTiles: TileData[] = [];
   private isPointerDown: boolean = false;
   private onWordSubmit: (selectedChars: string[], tileIds: string[]) => boolean;
+  private onInvalidSubmit: () => void;
   private currentGrid: GridData = [];
+  private clearedTileIds: Set<string> = new Set();
   private currentHintTileId: string | null = null;
 
   constructor(config: EngineConfig) {
@@ -32,13 +35,31 @@ export class PixiWordEngine {
     this.rows = config.rows;
     this.cols = config.cols;
     this.onWordSubmit = config.onWordSubmit;
+    this.onInvalidSubmit = config.onInvalidSubmit;
     this.app = new Application();
     this.boardContainer = new Container();
     this.lineGraphics = new Graphics();
   }
 
-  public async init(initialGrid: GridData) {
+  public async init(initialGrid: GridData, initialClearedWords: string[], targetWords: string[]) {
     this.currentGrid = initialGrid;
+    this.clearedTileIds.clear();
+
+    // 기존에 이미 맞춘 단어들의 타일 ID 식별
+    initialClearedWords.forEach((word) => {
+      const wId = targetWords.indexOf(word);
+      if (wId !== -1) {
+        for (let r = 0; r < this.rows; r++) {
+          for (let c = 0; c < this.cols; c++) {
+            const t = this.currentGrid[r][c];
+            if (t && t.wordId === wId) {
+              this.clearedTileIds.add(t.id);
+            }
+          }
+        }
+      }
+    });
+
     await this.app.init({
       resizeTo: this.container,
       backgroundColor: 0x0f172a,
@@ -81,11 +102,18 @@ export class PixiWordEngine {
         const y = r * (this.tileSize + this.tileGap);
         tileContainer.position.set(x, y);
 
+        const isAlreadyCleared = this.clearedTileIds.has(tile.id);
+
         const bg = new Graphics();
         bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-        bg.fill(0x334155);
+        bg.fill(isAlreadyCleared ? 0x1e293b : 0x334155);
 
-        const txt = new Text({ text: tile.char, style: textStyle });
+        const txt = new Text({
+          text: tile.char,
+          style: isAlreadyCleared
+            ? new TextStyle({ fontSize: 26, fill: '#475569', fontWeight: 'bold' })
+            : textStyle,
+        });
         txt.anchor.set(0.5);
         txt.position.set(this.tileSize / 2, this.tileSize / 2);
 
@@ -128,7 +156,7 @@ export class PixiWordEngine {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.currentGrid[r][c];
-        if (!tile) continue;
+        if (!tile || this.clearedTileIds.has(tile.id)) continue;
 
         const tx = c * (this.tileSize + this.tileGap);
         const ty = r * (this.tileSize + this.tileGap);
@@ -198,78 +226,40 @@ export class PixiWordEngine {
     const isSuccess = this.onWordSubmit(chars, ids);
 
     if (isSuccess) {
-      this.destroyMatchedTiles(ids);
-    } else {
-      this.selectedTiles.forEach((t) => this.highlightTile(t, false));
-      this.selectedTiles = [];
-      this.lineGraphics.clear();
-    }
-  }
-
-  private destroyMatchedTiles(tileIds: string[]) {
-    tileIds.forEach((id) => {
-      const sprite = this.tileSprites.get(id);
-      if (sprite) {
-        gsap.to(sprite.container.scale, {
-          x: 0,
-          y: 0,
-          duration: 0.2,
-          onComplete: () => {
-            this.boardContainer.removeChild(sprite.container);
-            sprite.container.destroy({ children: true });
-            this.tileSprites.delete(id);
-          },
-        });
-      }
-
-      for (let r = 0; r < this.rows; r++) {
-        for (let c = 0; c < this.cols; c++) {
-          if (this.currentGrid[r][c]?.id === id) {
-            this.currentGrid[r][c] = null;
-          }
+      // 중력 없이 타일 완료 상태(비활성화)로 전환
+      ids.forEach((id) => {
+        this.clearedTileIds.add(id);
+        const sprite = this.tileSprites.get(id);
+        if (sprite) {
+          sprite.bg.clear();
+          sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
+          sprite.bg.fill(0x1e293b);
+          sprite.text.style.fill = '#475569';
+          gsap.fromTo(sprite.container.scale, { x: 1.1, y: 1.1 }, { x: 1, y: 1, duration: 0.2 });
         }
-      }
-    });
+      });
+    } else {
+      // 오답: 흔들림 애니메이션 및 친절한 안내 콜백
+      this.selectedTiles.forEach((t) => {
+        const sprite = this.tileSprites.get(t.id);
+        if (sprite) {
+          gsap.to(sprite.container, { x: '+=4', yoyo: true, repeat: 3, duration: 0.05 });
+          this.highlightTile(t, false);
+        }
+      });
+      this.onInvalidSubmit();
+    }
 
     this.selectedTiles = [];
     this.lineGraphics.clear();
-
-    setTimeout(() => this.applyGravity(), 250);
   }
 
-  public applyGravity() {
-    for (let c = 0; c < this.cols; c++) {
-      let targetRow = this.rows - 1;
-      for (let r = this.rows - 1; r >= 0; r--) {
-        const tile = this.currentGrid[r][c];
-        if (tile !== null) {
-          if (targetRow !== r) {
-            this.currentGrid[targetRow][c] = tile;
-            this.currentGrid[r][c] = null;
-            tile.row = targetRow;
-
-            const sprite = this.tileSprites.get(tile.id);
-            if (sprite) {
-              const targetY = targetRow * (this.tileSize + this.tileGap);
-              gsap.to(sprite.container.position, { y: targetY, duration: 0.35, ease: 'bounce.out' });
-            }
-          }
-          targetRow--;
-        }
-      }
-    }
-  }
-
-  /**
-   * 힌트용 첫 글자 노란색 하이라이트 (플레이어 선택과 무관, 단순 시각 안내)
-   */
   public showHint(firstChar: string): boolean {
-    // 현재 판에서 해당 첫 글자를 가진 유효 타일 검색
     let targetTile: TileData | null = null;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const t = this.currentGrid[r][c];
-        if (t && t.char === firstChar) {
+        if (t && t.char === firstChar && !this.clearedTileIds.has(t.id)) {
           targetTile = t;
           break;
         }
@@ -278,33 +268,18 @@ export class PixiWordEngine {
     }
 
     if (!targetTile) return false;
-
     const sprite = this.tileSprites.get(targetTile.id);
     if (!sprite) return false;
 
-    // 이전 힌트 복원
-    if (this.currentHintTileId && this.currentHintTileId !== targetTile.id) {
-      const prev = this.tileSprites.get(this.currentHintTileId);
-      if (prev) {
-        prev.bg.clear();
-        prev.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-        prev.bg.fill(0x334155);
-      }
-    }
-
-    this.currentHintTileId = targetTile.id;
-
-    // 노란색/골드 하이라이트 및 펄스 효과
     sprite.bg.clear();
     sprite.bg.roundRect(0, 0, this.tileSize, this.tileSize, 10);
-    sprite.bg.fill(0xeab308); // 황금색
+    sprite.bg.fill(0xeab308);
 
     gsap.fromTo(
       sprite.container.scale,
       { x: 1, y: 1 },
-      { x: 1.15, y: 1.15, duration: 0.25, yoyo: true, repeat: 3 }
+      { x: 1.15, y: 1.15, duration: 0.2, yoyo: true, repeat: 3 }
     );
-
     return true;
   }
 
